@@ -1,14 +1,23 @@
 [package]
-name = "hauliage_sesame_idam_client"
+name = "sesame-idam-client"
 version = "0.1.0"
 edition = "2021"
-description = "Typed sesame-IDAM login client (may_minihttp client via brrtrouter::http)"
+rust-version = "1.85"
+description = "Typed Rust client and validated-claims adapter for Sesame-IDAM"
+license = "Apache-2.0"
+repository = "https://github.com/microscaler/sesame-idam-client"
+readme = "README.md"
+publish = false
 
 [dependencies]
-brrtrouter = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
+brrtrouter = { path = "../BRRTRouter", default-features = false }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 urlencoding = "2.1"
+uuid = { version = "1.0", features = ["serde"] }
 
 [dev-dependencies]
-serde_json = { workspace = true }
+serde_yaml = "0.9"
+
+[lints.rust]
+unsafe_code = "forbid"

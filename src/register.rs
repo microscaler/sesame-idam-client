@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use brrtrouter::http::{fetch_get, fetch_post, HttpFetchOptions};
 
 use crate::config::SesameIdamClientConfig;
@@ -81,6 +79,7 @@ pub fn signup_validate(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
 
     #[test]
     fn register_url_derived_from_login_url() {

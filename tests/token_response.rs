@@ -1,4 +1,4 @@
-use hauliage_sesame_idam_client::TokenResponse;
+use sesame_idam_client::TokenResponse;
 
 #[test]
 fn token_response_deserializes_sesame_shape() {

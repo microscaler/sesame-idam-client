@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use brrtrouter::http::{fetch_get, fetch_post, HttpFetchOptions};
 
 use crate::config::SesameIdamClientConfig;
@@ -72,7 +70,10 @@ pub fn invite_user_to_org(
     email: &str,
     role: &str,
 ) -> Result<InviteCreated, OrgClientError> {
-    let url = format!("{}/organizations/{org_id}/invitations", org_mgmt_base(config));
+    let url = format!(
+        "{}/organizations/{org_id}/invitations",
+        org_mgmt_base(config)
+    );
     let body = serde_json::json!({ "email": email, "role": role });
     post_invite(config, &url, access_token, &body)
 }
@@ -152,8 +153,8 @@ fn post_invite(
     if !(200..300).contains(&status) {
         return Err(OrgClientError::Upstream { status, body: text });
     }
-    let parsed: serde_json::Value =
-        serde_json::from_str(&text).map_err(|e| OrgClientError::Decode(format!("{e}; body={text}")))?;
+    let parsed: serde_json::Value = serde_json::from_str(&text)
+        .map_err(|e| OrgClientError::Decode(format!("{e}; body={text}")))?;
     let invite_id = parsed
         .get("invite_id")
         .and_then(|v| v.as_str())
@@ -173,26 +174,6 @@ fn post_invite(
         invite_id,
         invite_token,
     })
-}
-
-fn post_empty(
-    config: &SesameIdamClientConfig,
-    url: &str,
-    access_token: &str,
-    body: &serde_json::Value,
-) -> Result<(), OrgClientError> {
-    let bytes = serde_json::to_vec(body).map_err(|e| OrgClientError::Transport(e.to_string()))?;
-    let options = auth_options(config, access_token);
-    let (status, resp_bytes) =
-        fetch_post(url, &bytes, &options).map_err(|e| OrgClientError::Transport(e.to_string()))?;
-    let text = String::from_utf8(resp_bytes).unwrap_or_default();
-    if status == 401 {
-        return Err(OrgClientError::Unauthorized);
-    }
-    if !(200..300).contains(&status) {
-        return Err(OrgClientError::Upstream { status, body: text });
-    }
-    Ok(())
 }
 
 fn get_json<T: serde::de::DeserializeOwned>(
@@ -231,6 +212,7 @@ fn auth_options(config: &SesameIdamClientConfig, access_token: &str) -> HttpFetc
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
 
     fn cfg_with_login(login_url: &str) -> SesameIdamClientConfig {
         SesameIdamClientConfig {

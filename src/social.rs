@@ -14,13 +14,7 @@ pub fn social_login_start(
     provider: &str,
     redirect_uri: &str,
 ) -> Result<String, LoginError> {
-    let provider = provider.trim().to_ascii_lowercase();
-    if provider != "google" && provider != "microsoft" {
-        return Err(LoginError::Upstream {
-            status: 400,
-            body: r#"{"error":"unsupported_provider"}"#.to_string(),
-        });
-    }
+    let provider = provider_segment(provider)?;
     let redirect_uri = redirect_uri.trim();
     if redirect_uri.is_empty() {
         return Err(LoginError::Upstream {
@@ -35,7 +29,8 @@ pub fn social_login_start(
         urlencoding::encode(redirect_uri),
     );
     let options = tenant_options(config);
-    let response = fetch_get_full(&url, &options).map_err(|e| LoginError::Transport(e.to_string()))?;
+    let response =
+        fetch_get_full(&url, &options).map_err(|e| LoginError::Transport(e.to_string()))?;
 
     if (300..400).contains(&response.status) {
         return response.location.ok_or_else(|| LoginError::Upstream {
@@ -63,7 +58,7 @@ pub fn social_callback(
     state: &str,
     redirect_uri: &str,
 ) -> Result<TokenResponse, LoginError> {
-    let provider = provider.trim().to_ascii_lowercase();
+    let provider = provider_segment(provider)?;
     let url = format!("{}/auth/social/{provider}/callback", config.login_base());
     let body = serde_json::json!({
         "code": code,
@@ -96,14 +91,39 @@ fn tenant_options(config: &SesameIdamClientConfig) -> HttpFetchOptions {
     }
 }
 
+fn provider_segment(provider: &str) -> Result<String, LoginError> {
+    let provider = provider.trim().to_ascii_lowercase();
+    if provider.is_empty()
+        || !provider
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+    {
+        return Err(LoginError::Upstream {
+            status: 400,
+            body: r#"{"error":"invalid_provider"}"#.to_string(),
+        });
+    }
+    Ok(provider)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn rejects_unknown_provider() {
-        let cfg = SesameIdamClientConfig::default();
-        let err = social_login_start(&cfg, "github", "http://localhost/oauth/callback").unwrap_err();
+    fn rejects_empty_provider() {
+        let err = provider_segment(" ").unwrap_err();
         assert!(matches!(err, LoginError::Upstream { status: 400, .. }));
+    }
+
+    #[test]
+    fn rejects_provider_path_injection() {
+        let err = provider_segment("google/../../token").unwrap_err();
+        assert!(matches!(err, LoginError::Upstream { status: 400, .. }));
+    }
+
+    #[test]
+    fn accepts_provider_configured_by_sesame() {
+        assert_eq!(provider_segment("GitHub").unwrap(), "github");
     }
 }

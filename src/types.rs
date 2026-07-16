@@ -21,19 +21,17 @@ pub struct RegisterRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub username: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub send_welcome_email: Option<bool>,
+    pub phone: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SignupValidationResponse {
     #[serde(default)]
     pub allowed: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reason: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub email_exists: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub phone_exists: Option<bool>,
+    #[serde(default)]
+    pub reasons: Vec<String>,
+    #[serde(default)]
+    pub requires_mfa: bool,
 }
 
 /// Sesame login `TokenResponse` (required fields + optional enrichments).

@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use brrtrouter::http::{fetch_post, HttpFetchOptions};
 
 use crate::config::SesameIdamClientConfig;
@@ -49,6 +47,7 @@ pub fn auth_login(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
 
     #[test]
     fn default_timeout_allows_slow_bcrypt() {

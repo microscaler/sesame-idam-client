@@ -14,7 +14,7 @@ impl Default for SesameIdamClientConfig {
         Self {
             login_url: "http://127.0.0.1:8101/idam/v1/auth/login".to_string(),
             org_mgmt_url: None,
-            tenant_id: "hauliage".to_string(),
+            tenant_id: "default".to_string(),
             // Sesame bcrypt login is ~10s on ms02; keep headroom.
             timeout: Duration::from_secs(30),
         }
@@ -31,7 +31,7 @@ impl SesameIdamClientConfig {
         if let Ok(url) = std::env::var("SESAME_ORG_MGMT_URL") {
             cfg.org_mgmt_url = Some(url);
         }
-        if let Ok(tenant) = std::env::var("SESAME_TEST_TENANT") {
+        if let Ok(tenant) = std::env::var("SESAME_TENANT_ID") {
             cfg.tenant_id = tenant;
         }
         cfg

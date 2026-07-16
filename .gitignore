@@ -1,0 +1,13 @@
+/target/
+/.idea/
+/.vscode/
+*.swp
+*.swo
+.DS_Store
+._*
+.env
+.env.*
+!.env.example
+coverage/
+*.profraw
+lcov.info
