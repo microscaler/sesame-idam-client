@@ -1,0 +1,14 @@
+[package]
+name = "hauliage_sesame_idam_client"
+version = "0.1.0"
+edition = "2021"
+description = "Typed sesame-IDAM login client (may_minihttp client via brrtrouter::http)"
+
+[dependencies]
+brrtrouter = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+urlencoding = "2.1"
+
+[dev-dependencies]
+serde_json = { workspace = true }
