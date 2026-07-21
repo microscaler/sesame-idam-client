@@ -10,7 +10,11 @@ readme = "README.md"
 publish = false
 
 [dependencies]
-brrtrouter = { path = "../BRRTRouter", default-features = false }
+# Pinned git dep (CI truth): a path dep breaks every consumer that pulls this
+# crate from git. Local co-development redirects via the ancestor cargo config
+# (~/Workspace/remote/microscaler/.cargo/config.toml [patch]), never here.
+# rev 70ea09d = op-checkpoint-20260720.
+brrtrouter = { git = "https://github.com/microscaler/BRRTRouter.git", rev = "70ea09de7ee4343f176da274a2556d9900ca2be6", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 urlencoding = "2.1"
