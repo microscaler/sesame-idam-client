@@ -6,12 +6,7 @@ use crate::types::{RegisterRequest, SignupValidationResponse, TokenResponse};
 pub use crate::login::LoginError;
 
 fn auth_url(config: &SesameIdamClientConfig, path: &str) -> String {
-    config
-        .login_url
-        .trim_end_matches('/')
-        .strip_suffix("/auth/login")
-        .map(|base| format!("{base}{path}"))
-        .unwrap_or_else(|| format!("{}{path}", config.login_url.trim_end_matches('/')))
+    format!("{}{path}", config.login_base())
 }
 
 fn tenant_headers(config: &SesameIdamClientConfig) -> Vec<(String, String)> {
@@ -79,20 +74,23 @@ pub fn signup_validate(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
 
     #[test]
-    fn register_url_derived_from_login_url() {
-        let cfg = SesameIdamClientConfig {
-            login_url: "http://identity-login-service:8080/idam/v1/auth/login".to_string(),
-            org_mgmt_url: None,
-            session_url: None,
-            tenant_id: "hauliage".to_string(),
-            timeout: Duration::from_secs(30),
-        };
+    fn auth_urls_use_the_login_base_verbatim() {
+        let cfg = SesameIdamClientConfig::new(
+            "https://api.sesameidentity.dev.local/idam/v1",
+            "https://org-mgmt.internal.example/idam/v1",
+            "https://session.internal.example/idam/v1",
+            "hauliage",
+        )
+        .expect("valid config");
         assert_eq!(
             auth_url(&cfg, "/auth/register"),
-            "http://identity-login-service:8080/idam/v1/auth/register"
+            "https://api.sesameidentity.dev.local/idam/v1/auth/register"
+        );
+        assert_eq!(
+            auth_url(&cfg, "/auth/signup/validate"),
+            "https://api.sesameidentity.dev.local/idam/v1/auth/signup/validate"
         );
     }
 }

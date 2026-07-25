@@ -34,7 +34,7 @@ pub fn fetch_current_user(
     config: &SesameIdamClientConfig,
     access_token: &str,
 ) -> Result<SesameUserProfile, OrgClientError> {
-    let url = format!("{}/identity/me", session_base(config));
+    let url = identity_url(config, "/identity/me");
     get_json(config, &url, access_token)
 }
 
@@ -46,22 +46,28 @@ pub fn patch_current_user(
     last_name: Option<&str>,
     avatar_url: Option<&str>,
 ) -> Result<SesameUserProfile, OrgClientError> {
-    let url = format!("{}/identity/me", session_base(config));
+    let url = identity_url(config, "/identity/me");
     let mut body = serde_json::Map::new();
     if let Some(v) = first_name {
-        body.insert("first_name".into(), serde_json::Value::String(v.to_string()));
+        body.insert(
+            "first_name".into(),
+            serde_json::Value::String(v.to_string()),
+        );
     }
     if let Some(v) = last_name {
         body.insert("last_name".into(), serde_json::Value::String(v.to_string()));
     }
     if let Some(v) = avatar_url {
-        body.insert("avatar_url".into(), serde_json::Value::String(v.to_string()));
+        body.insert(
+            "avatar_url".into(),
+            serde_json::Value::String(v.to_string()),
+        );
     }
     let bytes = serde_json::to_vec(&serde_json::Value::Object(body))
         .map_err(|e| OrgClientError::Transport(e.to_string()))?;
     let options = auth_options(config, access_token);
-    let (status, resp_bytes) =
-        fetch_patch(&url, &bytes, &options).map_err(|e| OrgClientError::Transport(e.to_string()))?;
+    let (status, resp_bytes) = fetch_patch(&url, &bytes, &options)
+        .map_err(|e| OrgClientError::Transport(e.to_string()))?;
     let text = String::from_utf8(resp_bytes).unwrap_or_default();
     if status == 401 {
         return Err(OrgClientError::Unauthorized);
@@ -72,19 +78,16 @@ pub fn patch_current_user(
     serde_json::from_str(&text).map_err(|e| OrgClientError::Decode(format!("{e}; body={text}")))
 }
 
-fn session_base(config: &SesameIdamClientConfig) -> String {
-    if let Some(ref url) = config.session_url {
-        return url.trim_end_matches('/').to_string();
-    }
-    let login_base = config.login_base();
-    if login_base.contains(":8101") {
-        // Local PF convention: login 8101, session 8102 (when forwarded).
-        return login_base.replace(":8101", ":8102");
-    }
-    if login_base.contains("identity-login-service") {
-        return login_base.replace("identity-login-service", "identity-session-service");
-    }
-    login_base
+/// identity-session-service endpoint from the configured session base, verbatim.
+///
+/// WHY no derivation: this used to synthesise the session host out of the login
+/// base (`identity-login-service`→`identity-session-service`, dev `:8101`→
+/// `:8102`). The replacement silently became a no-op once the login host was a
+/// real hostname rather than the cluster service name, and `/identity/me` was
+/// then requested from the login host instead of failing. The base is now a
+/// required, independent config key — see [`crate::SESSION_BASE_URL_KEY`].
+fn identity_url(config: &SesameIdamClientConfig, path: &str) -> String {
+    format!("{}{path}", config.session_base())
 }
 
 fn get_json<T: serde::de::DeserializeOwned>(
@@ -123,20 +126,36 @@ fn auth_options(config: &SesameIdamClientConfig, access_token: &str) -> HttpFetc
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
+
+    const LOGIN: &str = "https://api.sesameidentity.dev.local/idam/v1";
+    const ORG: &str = "https://org-mgmt.internal.example/idam/v1";
+    const SESSION: &str = "https://session.internal.example/idam/v1";
+
+    fn cfg() -> SesameIdamClientConfig {
+        SesameIdamClientConfig::new(LOGIN, ORG, SESSION, "hauliage").expect("valid config")
+    }
 
     #[test]
-    fn session_base_maps_login_service_name() {
-        let cfg = SesameIdamClientConfig {
-            login_url: "http://identity-login-service.sesame-idam.svc.cluster.local:8080/idam/v1/auth/login".into(),
-            session_url: None,
-            org_mgmt_url: None,
-            tenant_id: "hauliage".into(),
-            timeout: Duration::from_secs(5),
-        };
+    fn identity_urls_use_the_session_base_verbatim() {
         assert_eq!(
-            session_base(&cfg),
-            "http://identity-session-service.sesame-idam.svc.cluster.local:8080/idam/v1"
+            identity_url(&cfg(), "/identity/me"),
+            "https://session.internal.example/idam/v1/identity/me"
+        );
+    }
+
+    /// Regression for the removed hostname derivation: a login URL on a host
+    /// that does not contain `identity-login-service` must not drag session
+    /// calls onto the login host.
+    #[test]
+    fn unrelated_login_host_never_routes_session_calls_to_login() {
+        let url = identity_url(&cfg(), "/identity/me");
+        assert!(
+            url.starts_with(SESSION),
+            "session call left the base: {url}"
+        );
+        assert!(
+            !url.contains("api.sesameidentity.dev.local"),
+            "session call was routed to the login host: {url}"
         );
     }
 }

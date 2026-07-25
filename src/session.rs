@@ -40,14 +40,10 @@ pub fn set_active_organization(
     serde_json::from_str(&text).map_err(|e| LoginError::Decode(format!("{e}; body={text}")))
 }
 
+/// `set_active_organization` is published by identity-login-service, so it uses
+/// the login base — verbatim, never trimmed out of a full endpoint URL.
 fn active_org_url(config: &SesameIdamClientConfig) -> String {
-    format!(
-        "{}/sessions/active-organization",
-        config
-            .login_url
-            .replace("/auth/login", "")
-            .trim_end_matches('/')
-    )
+    format!("{}/sessions/active-organization", config.login_base())
 }
 
 #[cfg(test)]
@@ -55,11 +51,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn active_org_url_from_login() {
-        let cfg = SesameIdamClientConfig::default();
+    fn active_org_url_uses_the_login_base_verbatim() {
+        let cfg = SesameIdamClientConfig::new(
+            "https://api.sesameidentity.dev.local/idam/v1",
+            "https://org-mgmt.internal.example/idam/v1",
+            "https://session.internal.example/idam/v1",
+            "hauliage",
+        )
+        .expect("valid config");
         assert_eq!(
             active_org_url(&cfg),
-            "http://127.0.0.1:8101/idam/v1/sessions/active-organization"
+            "https://api.sesameidentity.dev.local/idam/v1/sessions/active-organization"
         );
     }
 }

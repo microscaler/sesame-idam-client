@@ -46,7 +46,7 @@ pub fn create_organization(
     access_token: &str,
     name: &str,
 ) -> Result<OrganizationSummary, OrgClientError> {
-    let url = format!("{}/organizations", org_mgmt_base(config));
+    let url = org_mgmt_url(config, "/organizations");
     let body = serde_json::json!({ "name": name });
     post_json(config, &url, access_token, &body)
 }
@@ -57,7 +57,7 @@ pub fn accept_invitation(
     access_token: &str,
     token: &str,
 ) -> Result<OrganizationSummary, OrgClientError> {
-    let url = format!("{}/invitations/accept", org_mgmt_base(config));
+    let url = org_mgmt_url(config, "/invitations/accept");
     let body = serde_json::json!({ "token": token });
     post_json(config, &url, access_token, &body)
 }
@@ -70,10 +70,7 @@ pub fn invite_user_to_org(
     email: &str,
     role: &str,
 ) -> Result<InviteCreated, OrgClientError> {
-    let url = format!(
-        "{}/organizations/{org_id}/invitations",
-        org_mgmt_base(config)
-    );
+    let url = org_mgmt_url(config, &format!("/organizations/{org_id}/invitations"));
     let body = serde_json::json!({ "email": email, "role": role });
     post_invite(config, &url, access_token, &body)
 }
@@ -84,9 +81,9 @@ pub fn fetch_users_in_org(
     access_token: &str,
     org_id: &str,
 ) -> Result<UsersInOrgPage, OrgClientError> {
-    let url = format!(
-        "{}/organizations/{org_id}/users?page_size=100&page_number=0",
-        org_mgmt_base(config)
+    let url = org_mgmt_url(
+        config,
+        &format!("/organizations/{org_id}/users?page_size=100&page_number=0"),
     );
     get_json(config, &url, access_token)
 }
@@ -98,10 +95,7 @@ pub fn remove_user_from_org(
     org_id: &str,
     user_id: &str,
 ) -> Result<(), OrgClientError> {
-    let url = format!(
-        "{}/organizations/{org_id}/users/{user_id}",
-        org_mgmt_base(config)
-    );
+    let url = org_mgmt_url(config, &format!("/organizations/{org_id}/users/{user_id}"));
     let body = b"{}";
     delete_status(config, &url, access_token, Some(body.as_slice()))
 }
@@ -113,9 +107,9 @@ pub fn revoke_pending_invite(
     org_id: &str,
     invite_id: &str,
 ) -> Result<(), OrgClientError> {
-    let url = format!(
-        "{}/organizations/{org_id}/pending-invitations",
-        org_mgmt_base(config)
+    let url = org_mgmt_url(
+        config,
+        &format!("/organizations/{org_id}/pending-invitations"),
     );
     let body = serde_json::json!({ "invite_id": invite_id });
     let bytes = serde_json::to_vec(&body).map_err(|e| OrgClientError::Transport(e.to_string()))?;
@@ -141,26 +135,17 @@ fn delete_status(
     Ok(())
 }
 
-fn org_mgmt_base(config: &SesameIdamClientConfig) -> String {
-    if let Some(ref url) = config.org_mgmt_url {
-        return url.trim_end_matches('/').to_string();
-    }
-    let login_base = config
-        .login_url
-        .replace("/auth/login", "")
-        .trim_end_matches('/')
-        .to_string();
-    // Tilt dev host PF: identity-login 8101:8080; org-mgmt via manual PF
-    // `kubectl port-forward -n sesame-idam svc/org-mgmt 8104:8080`.
-    if login_base.contains(":8101") {
-        return login_base.replace(":8101", ":8104");
-    }
-    // In-cluster: org endpoints live on the org-mgmt Service (ClusterIP :8080),
-    // same /idam/v1 base path as login.
-    if login_base.contains("identity-login-service") {
-        return login_base.replace("identity-login-service", "org-mgmt");
-    }
-    login_base
+/// Org-mgmt endpoint from the configured org-mgmt base, verbatim.
+///
+/// WHY no derivation: this used to synthesise the org-mgmt host out of
+/// `login_url` (`identity-login-service`→`org-mgmt`, dev `:8101`→`:8104`).
+/// When the deployment moved to a real hostname the login URL no longer
+/// contained `identity-login-service`, the replacement became a no-op, and
+/// every org call was silently sent to the login host instead of failing.
+/// The base is now a required, independent config key — see
+/// [`crate::ORG_MGMT_BASE_URL_KEY`].
+fn org_mgmt_url(config: &SesameIdamClientConfig, path: &str) -> String {
+    format!("{}{path}", config.org_mgmt_base())
 }
 
 fn post_json(
@@ -262,41 +247,42 @@ fn auth_options(config: &SesameIdamClientConfig, access_token: &str) -> HttpFetc
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
 
-    fn cfg_with_login(login_url: &str) -> SesameIdamClientConfig {
-        SesameIdamClientConfig {
-            login_url: login_url.to_string(),
-            org_mgmt_url: None,
-            session_url: None,
-            tenant_id: "hauliage".to_string(),
-            timeout: Duration::from_secs(30),
-        }
+    const LOGIN: &str = "https://api.sesameidentity.dev.local/idam/v1";
+    const ORG: &str = "https://org-mgmt.internal.example/idam/v1";
+    const SESSION: &str = "https://session.internal.example/idam/v1";
+
+    fn cfg() -> SesameIdamClientConfig {
+        SesameIdamClientConfig::new(LOGIN, ORG, SESSION, "hauliage").expect("valid config")
     }
 
     #[test]
-    fn org_mgmt_base_strips_login_suffix() {
-        let cfg = cfg_with_login("http://localhost:8101/idam/v1/auth/login");
-        assert_eq!(org_mgmt_base(&cfg), "http://localhost:8104/idam/v1");
-    }
-
-    #[test]
-    fn org_mgmt_base_maps_in_cluster_service_name() {
-        let cfg = cfg_with_login(
-            "http://identity-login-service.sesame-idam.svc.cluster.local:8080/idam/v1/auth/login",
+    fn org_urls_use_the_org_mgmt_base_verbatim() {
+        let cfg = cfg();
+        assert_eq!(
+            org_mgmt_url(&cfg, "/organizations"),
+            "https://org-mgmt.internal.example/idam/v1/organizations"
         );
         assert_eq!(
-            org_mgmt_base(&cfg),
-            "http://org-mgmt.sesame-idam.svc.cluster.local:8080/idam/v1"
+            org_mgmt_url(&cfg, "/organizations/org-1/users/user-2"),
+            "https://org-mgmt.internal.example/idam/v1/organizations/org-1/users/user-2"
         );
     }
 
+    /// Regression for the removed hostname derivation: a login URL on a host
+    /// that does not contain `identity-login-service` must not drag org calls
+    /// onto the login host.
     #[test]
-    fn org_mgmt_base_prefers_explicit_url() {
-        let mut cfg = cfg_with_login(
-            "http://identity-login-service.sesame-idam.svc.cluster.local:8080/idam/v1/auth/login",
+    fn unrelated_login_host_never_routes_org_calls_to_login() {
+        let cfg = cfg();
+        let url = org_mgmt_url(&cfg, "/organizations");
+        assert!(
+            url.starts_with(ORG),
+            "org call left the org-mgmt base: {url}"
         );
-        cfg.org_mgmt_url = Some("http://org-mgmt.other:8080/idam/v1/".to_string());
-        assert_eq!(org_mgmt_base(&cfg), "http://org-mgmt.other:8080/idam/v1");
+        assert!(
+            !url.contains("api.sesameidentity.dev.local"),
+            "org call was routed to the login host: {url}"
+        );
     }
 }

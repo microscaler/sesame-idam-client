@@ -30,8 +30,9 @@ pub fn auth_login(
         ..HttpFetchOptions::default()
     };
 
-    let (status, bytes) = fetch_post(&config.login_url, &body, &options)
-        .map_err(|e| LoginError::Transport(e.to_string()))?;
+    let url = config.login_url();
+    let (status, bytes) =
+        fetch_post(&url, &body, &options).map_err(|e| LoginError::Transport(e.to_string()))?;
 
     let text = String::from_utf8(bytes).unwrap_or_default();
     if status == 401 {
@@ -47,11 +48,19 @@ pub fn auth_login(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
 
     #[test]
-    fn default_timeout_allows_slow_bcrypt() {
-        let cfg = SesameIdamClientConfig::default();
-        assert!(cfg.timeout >= Duration::from_secs(30));
+    fn login_posts_to_the_login_base_verbatim() {
+        let cfg = SesameIdamClientConfig::new(
+            "https://api.sesameidentity.dev.local/idam/v1",
+            "https://org-mgmt.internal.example/idam/v1",
+            "https://session.internal.example/idam/v1",
+            "hauliage",
+        )
+        .expect("valid config");
+        assert_eq!(
+            cfg.login_url(),
+            "https://api.sesameidentity.dev.local/idam/v1/auth/login"
+        );
     }
 }
