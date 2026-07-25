@@ -86,6 +86,7 @@ mod tests {
         let cfg = SesameIdamClientConfig {
             login_url: "http://identity-login-service:8080/idam/v1/auth/login".to_string(),
             org_mgmt_url: None,
+            session_url: None,
             tenant_id: "hauliage".to_string(),
             timeout: Duration::from_secs(30),
         };

@@ -6,6 +6,7 @@
 
 mod claims;
 mod config;
+mod identity;
 mod login;
 mod org;
 mod register;
@@ -18,10 +19,12 @@ pub use claims::{
     parse_validated_claims, ClaimsError, ValidatedClaims, AUTHORIZATION_CLAIMS_NAMESPACE,
 };
 pub use config::SesameIdamClientConfig;
+pub use identity::{fetch_current_user, patch_current_user, SesameUserProfile};
 pub use login::{auth_login, LoginError};
 pub use org::{
-    accept_invitation, create_organization, fetch_users_in_org, invite_user_to_org, InviteCreated,
-    OrgClientError, OrgMemberSummary, OrganizationSummary, UsersInOrgPage,
+    accept_invitation, create_organization, fetch_users_in_org, invite_user_to_org,
+    remove_user_from_org, revoke_pending_invite, InviteCreated, OrgClientError, OrgMemberSummary,
+    OrganizationSummary, UsersInOrgPage,
 };
 pub use register::{auth_register, signup_validate};
 pub use saml::{saml_callback, saml_login_start};

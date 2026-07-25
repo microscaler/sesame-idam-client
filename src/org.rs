@@ -1,4 +1,4 @@
-use brrtrouter::http::{fetch_get, fetch_post, HttpFetchOptions};
+use brrtrouter::http::{fetch_delete, fetch_get, fetch_post, HttpFetchOptions};
 
 use crate::config::SesameIdamClientConfig;
 
@@ -89,6 +89,56 @@ pub fn fetch_users_in_org(
         org_mgmt_base(config)
     );
     get_json(config, &url, access_token)
+}
+
+/// Remove a member from an organization (Sesame org-mgmt).
+pub fn remove_user_from_org(
+    config: &SesameIdamClientConfig,
+    access_token: &str,
+    org_id: &str,
+    user_id: &str,
+) -> Result<(), OrgClientError> {
+    let url = format!(
+        "{}/organizations/{org_id}/users/{user_id}",
+        org_mgmt_base(config)
+    );
+    let body = b"{}";
+    delete_status(config, &url, access_token, Some(body.as_slice()))
+}
+
+/// Revoke a pending invitation by invite_id.
+pub fn revoke_pending_invite(
+    config: &SesameIdamClientConfig,
+    access_token: &str,
+    org_id: &str,
+    invite_id: &str,
+) -> Result<(), OrgClientError> {
+    let url = format!(
+        "{}/organizations/{org_id}/pending-invitations",
+        org_mgmt_base(config)
+    );
+    let body = serde_json::json!({ "invite_id": invite_id });
+    let bytes = serde_json::to_vec(&body).map_err(|e| OrgClientError::Transport(e.to_string()))?;
+    delete_status(config, &url, access_token, Some(bytes.as_slice()))
+}
+
+fn delete_status(
+    config: &SesameIdamClientConfig,
+    url: &str,
+    access_token: &str,
+    body: Option<&[u8]>,
+) -> Result<(), OrgClientError> {
+    let options = auth_options(config, access_token);
+    let (status, resp_bytes) =
+        fetch_delete(url, body, &options).map_err(|e| OrgClientError::Transport(e.to_string()))?;
+    let text = String::from_utf8(resp_bytes).unwrap_or_default();
+    if status == 401 {
+        return Err(OrgClientError::Unauthorized);
+    }
+    if !(200..300).contains(&status) {
+        return Err(OrgClientError::Upstream { status, body: text });
+    }
+    Ok(())
 }
 
 fn org_mgmt_base(config: &SesameIdamClientConfig) -> String {
@@ -218,6 +268,7 @@ mod tests {
         SesameIdamClientConfig {
             login_url: login_url.to_string(),
             org_mgmt_url: None,
+            session_url: None,
             tenant_id: "hauliage".to_string(),
             timeout: Duration::from_secs(30),
         }
