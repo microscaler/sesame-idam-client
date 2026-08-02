@@ -57,6 +57,7 @@ mod tests {
             "https://org-mgmt.internal.example/idam/v1",
             "https://session.internal.example/idam/v1",
             "hauliage",
+            "hauliage-web",
         )
         .expect("valid config");
         assert_eq!(

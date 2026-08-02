@@ -9,6 +9,8 @@ pub const ORG_MGMT_BASE_URL_KEY: &str = "SESAME_ORG_MGMT_BASE_URL";
 pub const SESSION_BASE_URL_KEY: &str = "SESAME_SESSION_BASE_URL";
 /// Configuration key for the tenant sent as `X-Tenant-ID`.
 pub const TENANT_ID_KEY: &str = "SESAME_TENANT_ID";
+/// Configuration key for the registered relying-party client.
+pub const CLIENT_ID_KEY: &str = "SESAME_CLIENT_ID";
 
 /// Sesame bcrypt login is ~10s on ms02; keep headroom.
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
@@ -71,6 +73,7 @@ pub struct SesameIdamClientConfig {
     org_mgmt_base_url: String,
     session_base_url: String,
     pub tenant_id: String,
+    pub client_id: String,
     pub timeout: Duration,
 }
 
@@ -91,6 +94,7 @@ impl SesameIdamClientConfig {
         org_mgmt_base: impl Into<String>,
         session_base: impl Into<String>,
         tenant_id: impl Into<String>,
+        client_id: impl Into<String>,
     ) -> Result<Self, ConfigError> {
         let login_base_url = validate_base_url(LOGIN_BASE_URL_KEY, login_base.into())?;
         let org_mgmt_base_url = validate_base_url(ORG_MGMT_BASE_URL_KEY, org_mgmt_base.into())?;
@@ -99,11 +103,16 @@ impl SesameIdamClientConfig {
         if tenant_id.is_empty() {
             return Err(ConfigError::Missing { key: TENANT_ID_KEY });
         }
+        let client_id = client_id.into().trim().to_string();
+        if client_id.is_empty() {
+            return Err(ConfigError::Missing { key: CLIENT_ID_KEY });
+        }
         Ok(Self {
             login_base_url,
             org_mgmt_base_url,
             session_base_url,
             tenant_id,
+            client_id,
             timeout: DEFAULT_TIMEOUT,
         })
     }
@@ -148,6 +157,7 @@ impl SesameIdamClientConfig {
             lookup(ORG_MGMT_BASE_URL_KEY).unwrap_or_default(),
             lookup(SESSION_BASE_URL_KEY).unwrap_or_default(),
             lookup(TENANT_ID_KEY).unwrap_or_default(),
+            lookup(CLIENT_ID_KEY).unwrap_or_default(),
         )
     }
 
@@ -206,9 +216,23 @@ mod tests {
     const LOGIN: &str = "https://api.sesameidentity.dev.local/idam/v1";
     const ORG: &str = "https://org-mgmt.internal.example/idam/v1";
     const SESSION: &str = "https://session.internal.example/idam/v1";
+    const CLIENT: &str = "hauliage-web";
 
     fn cfg() -> SesameIdamClientConfig {
-        SesameIdamClientConfig::new(LOGIN, ORG, SESSION, "hauliage").expect("valid config")
+        SesameIdamClientConfig::new(LOGIN, ORG, SESSION, "hauliage", CLIENT)
+            .expect("valid config")
+    }
+
+    #[test]
+    fn registered_client_id_is_required() {
+        let error =
+            SesameIdamClientConfig::new(LOGIN, ORG, SESSION, "hauliage", "   ").unwrap_err();
+        assert_eq!(
+            error,
+            ConfigError::Missing {
+                key: CLIENT_ID_KEY
+            }
+        );
     }
 
     #[test]
@@ -230,6 +254,7 @@ mod tests {
             ORG,
             SESSION,
             "hauliage",
+            CLIENT,
         )
         .expect("valid config");
         assert_eq!(cfg.login_base(), LOGIN);
@@ -237,7 +262,8 @@ mod tests {
 
     #[test]
     fn missing_login_base_names_the_key() {
-        let error = SesameIdamClientConfig::new("", ORG, SESSION, "hauliage").unwrap_err();
+        let error =
+            SesameIdamClientConfig::new("", ORG, SESSION, "hauliage", CLIENT).unwrap_err();
         assert_eq!(
             error,
             ConfigError::Missing {
@@ -249,7 +275,8 @@ mod tests {
 
     #[test]
     fn missing_org_mgmt_base_names_the_key() {
-        let error = SesameIdamClientConfig::new(LOGIN, "", SESSION, "hauliage").unwrap_err();
+        let error =
+            SesameIdamClientConfig::new(LOGIN, "", SESSION, "hauliage", CLIENT).unwrap_err();
         assert_eq!(
             error,
             ConfigError::Missing {
@@ -261,7 +288,8 @@ mod tests {
 
     #[test]
     fn missing_session_base_names_the_key() {
-        let error = SesameIdamClientConfig::new(LOGIN, ORG, "", "hauliage").unwrap_err();
+        let error =
+            SesameIdamClientConfig::new(LOGIN, ORG, "", "hauliage", CLIENT).unwrap_err();
         assert_eq!(
             error,
             ConfigError::Missing {
@@ -273,7 +301,7 @@ mod tests {
 
     #[test]
     fn missing_tenant_names_the_key() {
-        let error = SesameIdamClientConfig::new(LOGIN, ORG, SESSION, "   ").unwrap_err();
+        let error = SesameIdamClientConfig::new(LOGIN, ORG, SESSION, "   ", CLIENT).unwrap_err();
         assert_eq!(error, ConfigError::Missing { key: TENANT_ID_KEY });
         assert!(error.to_string().contains("SESAME_TENANT_ID"));
     }
@@ -296,6 +324,7 @@ mod tests {
             ORG_MGMT_BASE_URL_KEY => Some(ORG.to_string()),
             SESSION_BASE_URL_KEY => Some(SESSION.to_string()),
             TENANT_ID_KEY => Some("hauliage".to_string()),
+            CLIENT_ID_KEY => Some(CLIENT.to_string()),
             _ => None,
         })
         .expect("valid config");
@@ -303,6 +332,7 @@ mod tests {
         assert_eq!(cfg.org_mgmt_base(), ORG);
         assert_eq!(cfg.session_base(), SESSION);
         assert_eq!(cfg.tenant_id, "hauliage");
+        assert_eq!(cfg.client_id, CLIENT);
     }
 
     #[test]
@@ -312,6 +342,7 @@ mod tests {
             ORG,
             SESSION,
             "hauliage",
+            CLIENT,
         )
         .unwrap_err();
         assert!(matches!(
@@ -326,8 +357,14 @@ mod tests {
     #[test]
     fn rejects_a_base_without_a_scheme() {
         let error =
-            SesameIdamClientConfig::new(LOGIN, "org-mgmt:8080/idam/v1", SESSION, "hauliage")
-                .unwrap_err();
+            SesameIdamClientConfig::new(
+                LOGIN,
+                "org-mgmt:8080/idam/v1",
+                SESSION,
+                "hauliage",
+                CLIENT,
+            )
+            .unwrap_err();
         assert!(matches!(
             error,
             ConfigError::Invalid {

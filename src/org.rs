@@ -253,7 +253,8 @@ mod tests {
     const SESSION: &str = "https://session.internal.example/idam/v1";
 
     fn cfg() -> SesameIdamClientConfig {
-        SesameIdamClientConfig::new(LOGIN, ORG, SESSION, "hauliage").expect("valid config")
+        SesameIdamClientConfig::new(LOGIN, ORG, SESSION, "hauliage", "hauliage-web")
+            .expect("valid config")
     }
 
     #[test]

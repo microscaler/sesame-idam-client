@@ -25,8 +25,8 @@ pub use claims::{
     parse_validated_claims, ClaimsError, ValidatedClaims, AUTHORIZATION_CLAIMS_NAMESPACE,
 };
 pub use config::{
-    ConfigError, SesameIdamClientConfig, LOGIN_BASE_URL_KEY, ORG_MGMT_BASE_URL_KEY,
-    SESSION_BASE_URL_KEY, TENANT_ID_KEY,
+    ConfigError, SesameIdamClientConfig, CLIENT_ID_KEY, LOGIN_BASE_URL_KEY,
+    ORG_MGMT_BASE_URL_KEY, SESSION_BASE_URL_KEY, TENANT_ID_KEY,
 };
 pub use identity::{fetch_current_user, patch_current_user, SesameUserProfile};
 pub use login::{auth_login, LoginError};
