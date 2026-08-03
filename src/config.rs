@@ -11,6 +11,9 @@ pub const SESSION_BASE_URL_KEY: &str = "SESAME_SESSION_BASE_URL";
 pub const TENANT_ID_KEY: &str = "SESAME_TENANT_ID";
 /// Configuration key for the registered relying-party client.
 pub const CLIENT_ID_KEY: &str = "SESAME_CLIENT_ID";
+/// Optional public north–south API base (`…/idam/v1`). When set, fills any
+/// missing login/org/session base with the same value (Epic 16 dogfood).
+pub const PUBLIC_API_BASE_URL_KEY: &str = "SESAME_PUBLIC_API_BASE_URL";
 
 /// Sesame bcrypt login is ~10s on ms02; keep headroom.
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
@@ -146,19 +149,43 @@ impl SesameIdamClientConfig {
     /// # Ok::<(), sesame_idam_client::ConfigError>(())
     /// ```
     ///
+    /// When [`PUBLIC_API_BASE_URL_KEY`] is set, it fills any missing
+    /// login/org/session base so a single public edge URL is enough.
+    ///
     /// # Errors
     ///
     /// See [`SesameIdamClientConfig::new`].
     pub fn from_lookup(
         lookup: impl Fn(&'static str) -> Option<String>,
     ) -> Result<Self, ConfigError> {
+        let public = lookup(PUBLIC_API_BASE_URL_KEY).filter(|v| !v.trim().is_empty());
+        let pick = |key: &'static str| -> String {
+            lookup(key)
+                .filter(|v| !v.trim().is_empty())
+                .or_else(|| public.clone())
+                .unwrap_or_default()
+        };
         Self::new(
-            lookup(LOGIN_BASE_URL_KEY).unwrap_or_default(),
-            lookup(ORG_MGMT_BASE_URL_KEY).unwrap_or_default(),
-            lookup(SESSION_BASE_URL_KEY).unwrap_or_default(),
+            pick(LOGIN_BASE_URL_KEY),
+            pick(ORG_MGMT_BASE_URL_KEY),
+            pick(SESSION_BASE_URL_KEY),
             lookup(TENANT_ID_KEY).unwrap_or_default(),
             lookup(CLIENT_ID_KEY).unwrap_or_default(),
         )
+    }
+
+    /// All Sesame traffic through one public `/idam/v1` base (north–south edge).
+    ///
+    /// # Errors
+    ///
+    /// See [`SesameIdamClientConfig::new`].
+    pub fn from_public_api_base(
+        public_api_base: impl Into<String>,
+        tenant_id: impl Into<String>,
+        client_id: impl Into<String>,
+    ) -> Result<Self, ConfigError> {
+        let base = public_api_base.into();
+        Self::new(base.clone(), base.clone(), base, tenant_id, client_id)
     }
 
     /// Base URL for identity-login-service (`…/idam/v1`).
@@ -245,6 +272,29 @@ mod tests {
             cfg.login_url(),
             "https://api.sesameidentity.dev.local/idam/v1/auth/login"
         );
+    }
+
+    #[test]
+    fn public_api_base_fills_all_service_bases() {
+        let cfg = SesameIdamClientConfig::from_public_api_base(LOGIN, "hauliage", CLIENT)
+            .expect("public base");
+        assert_eq!(cfg.login_base(), LOGIN);
+        assert_eq!(cfg.org_mgmt_base(), LOGIN);
+        assert_eq!(cfg.session_base(), LOGIN);
+    }
+
+    #[test]
+    fn lookup_uses_public_api_when_service_bases_absent() {
+        let cfg = SesameIdamClientConfig::from_lookup(|key| match key {
+            PUBLIC_API_BASE_URL_KEY => Some(LOGIN.to_string()),
+            TENANT_ID_KEY => Some("hauliage".into()),
+            CLIENT_ID_KEY => Some(CLIENT.into()),
+            _ => None,
+        })
+        .expect("lookup");
+        assert_eq!(cfg.login_base(), LOGIN);
+        assert_eq!(cfg.org_mgmt_base(), LOGIN);
+        assert_eq!(cfg.session_base(), LOGIN);
     }
 
     #[test]

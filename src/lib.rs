@@ -28,7 +28,7 @@ pub use claims::{
 };
 pub use config::{
     ConfigError, SesameIdamClientConfig, CLIENT_ID_KEY, LOGIN_BASE_URL_KEY,
-    ORG_MGMT_BASE_URL_KEY, SESSION_BASE_URL_KEY, TENANT_ID_KEY,
+    ORG_MGMT_BASE_URL_KEY, PUBLIC_API_BASE_URL_KEY, SESSION_BASE_URL_KEY, TENANT_ID_KEY,
 };
 pub use identity::{fetch_current_user, patch_current_user, SesameUserProfile};
 pub use login::{auth_login, LoginError};
