@@ -1,4 +1,4 @@
-use brrtrouter::http::{fetch_delete, fetch_get, fetch_post, HttpFetchOptions};
+use brrtrouter::http::{fetch_delete, fetch_get, fetch_patch, fetch_post, HttpFetchOptions};
 
 use crate::config::SesameIdamClientConfig;
 
@@ -98,6 +98,99 @@ pub fn remove_user_from_org(
     let url = org_mgmt_url(config, &format!("/organizations/{org_id}/users/{user_id}"));
     let body = b"{}";
     delete_status(config, &url, access_token, Some(body.as_slice()))
+}
+
+/// Change a member's primary role (non-owner roles only; Owner via transfer).
+pub fn change_user_role_in_org(
+    config: &SesameIdamClientConfig,
+    access_token: &str,
+    org_id: &str,
+    user_id: &str,
+    primary_role: &str,
+) -> Result<(), OrgClientError> {
+    let url = org_mgmt_url(
+        config,
+        &format!("/organizations/{org_id}/users/{user_id}/role"),
+    );
+    let body = serde_json::json!({ "primary_role": primary_role });
+    let bytes = serde_json::to_vec(&body).map_err(|e| OrgClientError::Transport(e.to_string()))?;
+    let options = auth_options(config, access_token);
+    let (status, resp_bytes) =
+        fetch_patch(&url, &bytes, &options).map_err(|e| OrgClientError::Transport(e.to_string()))?;
+    let text = String::from_utf8(resp_bytes).unwrap_or_default();
+    if status == 401 {
+        return Err(OrgClientError::Unauthorized);
+    }
+    if !(200..300).contains(&status) {
+        return Err(OrgClientError::Upstream { status, body: text });
+    }
+    Ok(())
+}
+
+/// Request email OTP challenge before product-path Owner transfer.
+pub fn challenge_org_owner_transfer(
+    config: &SesameIdamClientConfig,
+    access_token: &str,
+    org_id: &str,
+) -> Result<serde_json::Value, OrgClientError> {
+    let url = org_mgmt_url(
+        config,
+        &format!("/organizations/{org_id}/owner/transfer/challenge"),
+    );
+    let options = auth_options(config, access_token);
+    let (status, resp_bytes) =
+        fetch_post(&url, b"{}", &options).map_err(|e| OrgClientError::Transport(e.to_string()))?;
+    let text = String::from_utf8(resp_bytes).unwrap_or_default();
+    if status == 401 {
+        return Err(OrgClientError::Unauthorized);
+    }
+    if !(200..300).contains(&status) {
+        return Err(OrgClientError::Upstream { status, body: text });
+    }
+    serde_json::from_str(&text).map_err(|e| OrgClientError::Decode(format!("{e}; body={text}")))
+}
+
+/// Transfer organization ownership (product path — caller must be current Owner).
+///
+/// Dual-factor: `password` (account password) + `otp` from [`challenge_org_owner_transfer`].
+pub fn transfer_org_owner(
+    config: &SesameIdamClientConfig,
+    access_token: &str,
+    org_id: &str,
+    successor_user_id: &str,
+    former_owner_disposition: Option<&str>,
+    reason: Option<&str>,
+    otp: Option<&str>,
+    password: Option<&str>,
+) -> Result<serde_json::Value, OrgClientError> {
+    let url = org_mgmt_url(config, &format!("/organizations/{org_id}/owner/transfer"));
+    let mut body = serde_json::json!({
+        "successor_user_id": successor_user_id,
+    });
+    if let Some(disposition) = former_owner_disposition {
+        body["former_owner_disposition"] = serde_json::json!(disposition);
+    }
+    if let Some(reason) = reason.filter(|s| !s.trim().is_empty()) {
+        body["reason"] = serde_json::json!(reason);
+    }
+    if let Some(otp) = otp.map(str::trim).filter(|s| !s.is_empty()) {
+        body["otp"] = serde_json::json!(otp);
+    }
+    if let Some(password) = password.filter(|s| !s.is_empty()) {
+        body["password"] = serde_json::json!(password);
+    }
+    let bytes = serde_json::to_vec(&body).map_err(|e| OrgClientError::Transport(e.to_string()))?;
+    let options = auth_options(config, access_token);
+    let (status, resp_bytes) =
+        fetch_post(&url, &bytes, &options).map_err(|e| OrgClientError::Transport(e.to_string()))?;
+    let text = String::from_utf8(resp_bytes).unwrap_or_default();
+    if status == 401 {
+        return Err(OrgClientError::Unauthorized);
+    }
+    if !(200..300).contains(&status) {
+        return Err(OrgClientError::Upstream { status, body: text });
+    }
+    serde_json::from_str(&text).map_err(|e| OrgClientError::Decode(format!("{e}; body={text}")))
 }
 
 /// Revoke a pending invitation by invite_id.

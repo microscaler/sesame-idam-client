@@ -33,9 +33,10 @@ pub use config::{
 pub use identity::{fetch_current_user, patch_current_user, SesameUserProfile};
 pub use login::{auth_login, LoginError};
 pub use org::{
-    accept_invitation, create_organization, fetch_users_in_org, invite_user_to_org,
-    remove_user_from_org, revoke_pending_invite, InviteCreated, OrgClientError, OrgMemberSummary,
-    OrganizationSummary, UsersInOrgPage,
+    accept_invitation, change_user_role_in_org, create_organization, fetch_users_in_org,
+    challenge_org_owner_transfer, invite_user_to_org, remove_user_from_org,
+    revoke_pending_invite, transfer_org_owner,
+    InviteCreated, OrgClientError, OrgMemberSummary, OrganizationSummary, UsersInOrgPage,
 };
 pub use register::{auth_register, signup_validate};
 pub use saml::{saml_callback, saml_login_start};
