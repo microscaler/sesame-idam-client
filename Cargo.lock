@@ -3752,11 +3752,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b"
 
 [[patch.unused]]
-name = "brrtrouter_macros"
+name = "may_postgres"
 version = "0.1.0"
 
 [[patch.unused]]
-name = "may_postgres"
+name = "brrtrouter_macros"
 version = "0.1.0"
 
 [[patch.unused]]

@@ -108,12 +108,12 @@ fn get_json<T: serde::de::DeserializeOwned>(
     serde_json::from_str(&text).map_err(|e| OrgClientError::Decode(format!("{e}; body={text}")))
 }
 
+/// Bearer identity calls bind tenant from the JWT. Do not send `X-Tenant-ID`.
 fn auth_options(config: &SesameIdamClientConfig, access_token: &str) -> HttpFetchOptions {
     HttpFetchOptions {
         timeout: config.timeout,
         extra_headers: vec![
             ("Content-Type".to_string(), "application/json".to_string()),
-            ("X-Tenant-ID".to_string(), config.tenant_id.clone()),
             (
                 "Authorization".to_string(),
                 format!("Bearer {access_token}"),
