@@ -1,22 +1,36 @@
 //! Parsing for claims that BRRTRouter has already authenticated.
+//!
+//! Mapping aligns with Sesame provider profile `1.0.0` and
+//! `docs/standards-first-oidc/verified-principal-mapping-v1.md`.
 
-use serde_json::Value;
+use serde_json::{json, Value};
 use uuid::Uuid;
 
 /// Namespace containing Sesame authorization claims.
 pub const AUTHORIZATION_CLAIMS_NAMESPACE: &str = "https://sesame-idam.dev/claims";
+
+/// Supported provider profile version for this client release.
+pub const SUPPORTED_PROVIDER_PROFILE: &str = "1.0.0";
+
+/// Supported public tenant-consumer OpenAPI version.
+pub const SUPPORTED_TENANT_CONSUMER_API: &str = "1.0.0";
+
+/// Supported conformance fixture version.
+pub const SUPPORTED_FIXTURE_VERSION: &str = "1.1.0";
 
 /// Identity and authorization facts required by tenant-aware consumers.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ValidatedClaims {
     pub tenant_id: String,
     pub subject_id: Uuid,
-    pub organization_id: Uuid,
+    pub organization_id: Option<Uuid>,
     pub session_id: String,
+    pub client_id: Option<String>,
     pub roles: Vec<String>,
     pub permissions: Vec<String>,
     pub user_type: Option<String>,
     pub org_type: Option<String>,
+    pub token_version: Option<u64>,
 }
 
 /// Failure to convert authenticated Sesame claims into a consumer context.
@@ -55,6 +69,8 @@ impl std::error::Error for ClaimsError {}
 /// cryptographic verification at the request boundary prevents consumers from
 /// accidentally trusting decoded-but-unverified tokens.
 ///
+/// `org_id` may be absent or JSON null (pre-organization state).
+///
 /// # Errors
 ///
 /// Returns [`ClaimsError`] when required identity claims are missing, malformed,
@@ -71,8 +87,10 @@ pub fn parse_validated_claims(claims: Option<&Value>) -> Result<ValidatedClaims,
         });
     }
 
-    let organization_id = required_uuid(required(claims, "org_id")?, "org_id")?;
+    let organization_id = optional_uuid(claims.get("org_id"), "org_id")?;
     let session_id = required_string(required(claims, "sid")?, "sid")?;
+    let client_id = optional_string(claims.get("client_id"), "client_id")?;
+    let token_version = optional_u64(claims.get("ver"), "ver")?;
     let authorization = claims
         .get(AUTHORIZATION_CLAIMS_NAMESPACE)
         .and_then(Value::as_object)
@@ -95,6 +113,7 @@ pub fn parse_validated_claims(claims: Option<&Value>) -> Result<ValidatedClaims,
         subject_id,
         organization_id,
         session_id: session_id.to_string(),
+        client_id,
         roles: string_array(
             authorization
                 .get("roles")
@@ -109,7 +128,40 @@ pub fn parse_validated_claims(claims: Option<&Value>) -> Result<ValidatedClaims,
         )?,
         user_type: optional_string(claims.get("user_type"), "user_type")?,
         org_type: optional_string(authorization.get("org_type"), "sx.org_type")?,
+        token_version,
     })
+}
+
+/// Map validated access-token claims to verified-principal v1 JSON.
+pub fn map_to_verified_principal(claims: &ValidatedClaims) -> Result<Value, ClaimsError> {
+    let client_id = claims
+        .client_id
+        .as_deref()
+        .ok_or(ClaimsError::MissingField("client_id"))?;
+    let token_version = claims
+        .token_version
+        .ok_or(ClaimsError::MissingField("ver"))?;
+    let user_type = claims
+        .user_type
+        .as_deref()
+        .ok_or(ClaimsError::MissingField("user_type"))?;
+
+    Ok(json!({
+        "profile_version": SUPPORTED_PROVIDER_PROFILE,
+        "tenant_id": claims.tenant_id,
+        "subject": claims.subject_id.to_string(),
+        "client_id": client_id,
+        "application_id": client_id,
+        "session_id": claims.session_id,
+        "token_version": token_version,
+        "organization_id": claims.organization_id.map(|id| id.to_string()),
+        "user_type": user_type,
+        "roles": claims.roles,
+        "permissions": claims.permissions,
+        "entitlements_ref": Value::Null,
+        "entitlements_hash": Value::Null,
+        "actor": Value::Null,
+    }))
 }
 
 fn required<'a>(value: &'a Value, field: &'static str) -> Result<&'a Value, ClaimsError> {
@@ -131,6 +183,24 @@ fn required_uuid(value: &Value, field: &'static str) -> Result<Uuid, ClaimsError
     Uuid::parse_str(required_string(value, field)?).map_err(|_| ClaimsError::InvalidField(field))
 }
 
+fn optional_uuid(value: Option<&Value>, field: &'static str) -> Result<Option<Uuid>, ClaimsError> {
+    match value {
+        None | Some(Value::Null) => Ok(None),
+        Some(value) => required_uuid(value, field).map(Some),
+    }
+}
+
+fn optional_u64(value: Option<&Value>, field: &'static str) -> Result<Option<u64>, ClaimsError> {
+    match value {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::Number(number)) => number
+            .as_u64()
+            .ok_or(ClaimsError::InvalidField(field))
+            .map(Some),
+        Some(_) => Err(ClaimsError::InvalidField(field)),
+    }
+}
+
 fn string_array(value: &Value, field: &'static str) -> Result<Vec<String>, ClaimsError> {
     value
         .as_array()
@@ -144,9 +214,10 @@ fn optional_string(
     value: Option<&Value>,
     field: &'static str,
 ) -> Result<Option<String>, ClaimsError> {
-    value
-        .map(|value| required_string(value, field).map(str::to_string))
-        .transpose()
+    match value {
+        None | Some(Value::Null) => Ok(None),
+        Some(value) => required_string(value, field).map(|s| Some(s.to_string())),
+    }
 }
 
 #[cfg(test)]
@@ -158,11 +229,13 @@ mod tests {
             "sub": "a1000001-0001-4000-8000-000000000004",
             "user_id": "a1000001-0001-4000-8000-000000000004",
             "sid": "session-1",
-            "tenant_id": "hauliage",
+            "client_id": "acme-web",
+            "ver": 1,
+            "tenant_id": "acme",
             "org_id": "b2000002-0002-4000-8000-000000000002",
             "user_type": "service",
             "https://sesame-idam.dev/claims": {
-                "tenant": "hauliage",
+                "tenant": "acme",
                 "roles": ["billing"],
                 "permissions": ["accounting:invoice:write"]
             }
@@ -172,8 +245,20 @@ mod tests {
     #[test]
     fn parses_complete_context() {
         let parsed = parse_validated_claims(Some(&claims())).expect("valid claims");
-        assert_eq!(parsed.tenant_id, "hauliage");
+        assert_eq!(parsed.tenant_id, "acme");
         assert_eq!(parsed.roles, ["billing"]);
+        assert!(parsed.organization_id.is_some());
+    }
+
+    #[test]
+    fn parses_pre_org_null_organization() {
+        let mut value = claims();
+        value["org_id"] = Value::Null;
+        let parsed = parse_validated_claims(Some(&value)).expect("pre-org");
+        assert!(parsed.organization_id.is_none());
+        let principal = map_to_verified_principal(&parsed).expect("principal");
+        assert_eq!(principal["organization_id"], Value::Null);
+        assert_eq!(principal["profile_version"], SUPPORTED_PROVIDER_PROFILE);
     }
 
     #[test]

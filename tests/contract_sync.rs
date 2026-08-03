@@ -118,3 +118,66 @@ fn signup_and_registration_shapes_match_typed_client() {
         "deprecated send_welcome_email returned to provider contract"
     );
 }
+
+#[test]
+fn tenant_consumer_public_contract_lockstep() {
+    use sesame_idam_client::{
+        SUPPORTED_FIXTURE_VERSION, SUPPORTED_PROVIDER_PROFILE, SUPPORTED_TENANT_CONSUMER_API,
+    };
+
+    let root = sesame_repo();
+    let tenant = read_spec(&root.join("openapi/idam/tenant-consumer/openapi.yaml"));
+    assert_eq!(
+        tenant
+            .get("info")
+            .and_then(|info| info.get("version"))
+            .and_then(Value::as_str),
+        Some(SUPPORTED_TENANT_CONSUMER_API),
+        "client SUPPORTED_TENANT_CONSUMER_API out of sync"
+    );
+    assert_eq!(
+        tenant
+            .get("info")
+            .and_then(|info| info.get("x-provider-profile"))
+            .and_then(Value::as_str),
+        Some(SUPPORTED_PROVIDER_PROFILE)
+    );
+    assert_eq!(
+        tenant
+            .get("info")
+            .and_then(|info| info.get("x-fixture-version"))
+            .and_then(Value::as_str),
+        Some(SUPPORTED_FIXTURE_VERSION)
+    );
+
+    for (method, path, operation) in [
+        ("post", "/auth/register", "register_user"),
+        ("get", "/users/me/memberships", "list_my_memberships"),
+        ("post", "/organizations", "create_organization"),
+        (
+            "post",
+            "/organizations/{org_id}/invitations",
+            "invite_user_to_organization",
+        ),
+        ("post", "/invitations/accept", "accept_invitation"),
+        ("get", "/invitations/preview", "preview_invitation"),
+        (
+            "post",
+            "/sessions/active-organization",
+            "set_active_organization",
+        ),
+    ] {
+        assert_operation(&tenant, method, path, operation);
+    }
+
+    let version = fs::read_to_string(root.join("conformance/oidc-v1/VERSION"))
+        .expect("conformance VERSION");
+    assert!(
+        version.contains(&format!("provider_profile={SUPPORTED_PROVIDER_PROFILE}")),
+        "fixture VERSION provider_profile mismatch"
+    );
+    assert!(
+        version.contains(&format!("fixture_version={SUPPORTED_FIXTURE_VERSION}")),
+        "fixture VERSION fixture_version mismatch"
+    );
+}

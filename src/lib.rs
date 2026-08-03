@@ -22,7 +22,9 @@ mod social;
 mod types;
 
 pub use claims::{
-    parse_validated_claims, ClaimsError, ValidatedClaims, AUTHORIZATION_CLAIMS_NAMESPACE,
+    map_to_verified_principal, parse_validated_claims, ClaimsError, ValidatedClaims,
+    AUTHORIZATION_CLAIMS_NAMESPACE, SUPPORTED_FIXTURE_VERSION, SUPPORTED_PROVIDER_PROFILE,
+    SUPPORTED_TENANT_CONSUMER_API,
 };
 pub use config::{
     ConfigError, SesameIdamClientConfig, CLIENT_ID_KEY, LOGIN_BASE_URL_KEY,
