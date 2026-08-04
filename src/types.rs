@@ -12,6 +12,7 @@ pub struct LoginRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RegisterRequest {
+    pub client_id: String,
     pub email: String,
     pub password: String,
     #[serde(skip_serializing_if = "Option::is_none")]
