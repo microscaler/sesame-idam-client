@@ -24,11 +24,16 @@ pub fn social_login_start(
     }
 
     let url = format!(
-        "{}/auth/social/{provider}/login?redirect_uri={}",
+        "{}/auth/social/{provider}/login?client_id={}&redirect_uri={}",
         config.login_base(),
+        urlencoding::encode(&config.client_id),
         urlencoding::encode(redirect_uri),
     );
-    let options = tenant_options(config);
+    // Public north–south: tenant comes from client_id; omit X-Tenant-ID.
+    let options = HttpFetchOptions {
+        timeout: config.timeout,
+        ..HttpFetchOptions::default()
+    };
     let response =
         fetch_get_full(&url, &options).map_err(|e| LoginError::Transport(e.to_string()))?;
 
