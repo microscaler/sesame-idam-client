@@ -101,6 +101,7 @@ fn signup_and_registration_shapes_match_typed_client() {
         &["components", "schemas", "RegisterRequest", "properties"],
     );
     for field in [
+        "client_id",
         "email",
         "password",
         "first_name",
@@ -116,6 +117,20 @@ fn signup_and_registration_shapes_match_typed_client() {
     assert!(
         !registration.contains_key("send_welcome_email"),
         "deprecated send_welcome_email returned to provider contract"
+    );
+
+    let register_required = spec
+        .get("components")
+        .and_then(|c| c.get("schemas"))
+        .and_then(|s| s.get("RegisterRequest"))
+        .and_then(|s| s.get("required"))
+        .and_then(Value::as_sequence)
+        .expect("RegisterRequest.required");
+    assert!(
+        register_required
+            .iter()
+            .any(|v| v.as_str() == Some("client_id")),
+        "RegisterRequest must require client_id"
     );
 }
 
@@ -168,6 +183,38 @@ fn tenant_consumer_public_contract_lockstep() {
         ),
     ] {
         assert_operation(&tenant, method, path, operation);
+    }
+
+    let schemas = mapping_at(&tenant, &["components", "schemas"]);
+    for schema in [
+        "RegisterRequest",
+        "InvitationCreated",
+        "OrganizationSummary",
+        "InvitationPreview",
+    ] {
+        assert!(
+            schemas.contains_key(schema),
+            "tenant-consumer missing schema {schema}"
+        );
+    }
+    let invite = mapping_at(
+        &tenant,
+        &["components", "schemas", "InvitationCreated", "properties"],
+    );
+    for field in ["success", "invite_id", "invite_token"] {
+        assert!(invite.contains_key(field), "InvitationCreated lost {field}");
+    }
+    let org = mapping_at(
+        &tenant,
+        &[
+            "components",
+            "schemas",
+            "OrganizationSummary",
+            "properties",
+        ],
+    );
+    for field in ["id", "name", "tenant_id"] {
+        assert!(org.contains_key(field), "OrganizationSummary lost {field}");
     }
 
     let version = fs::read_to_string(root.join("conformance/oidc-v1/VERSION"))

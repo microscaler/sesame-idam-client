@@ -13,7 +13,7 @@ pub const AUTHORIZATION_CLAIMS_NAMESPACE: &str = "https://sesame-idam.dev/claims
 pub const SUPPORTED_PROVIDER_PROFILE: &str = "1.0.0";
 
 /// Supported public tenant-consumer OpenAPI version.
-pub const SUPPORTED_TENANT_CONSUMER_API: &str = "1.0.0";
+pub const SUPPORTED_TENANT_CONSUMER_API: &str = "1.1.0";
 
 /// Supported conformance fixture version.
 pub const SUPPORTED_FIXTURE_VERSION: &str = "1.1.0";

@@ -60,12 +60,18 @@ pub fn auth_register(
 }
 
 /// Check signup eligibility via sesame `GET /idam/v1/auth/signup/validate`.
+///
+/// Injects `client_id` from config so tenant resolution matches register/login.
 pub fn signup_validate(
     config: &SesameIdamClientConfig,
     email: &str,
 ) -> Result<SignupValidationResponse, LoginError> {
     let base = auth_url(config, "/auth/signup/validate");
-    let url = format!("{base}?email={}", urlencoding::encode(email));
+    let url = format!(
+        "{base}?client_id={}&email={}",
+        urlencoding::encode(&config.client_id),
+        urlencoding::encode(email)
+    );
     let options = HttpFetchOptions {
         timeout: config.timeout,
         extra_headers: pre_auth_headers(),
