@@ -15,6 +15,7 @@ mod config;
 mod identity;
 mod login;
 mod org;
+mod password;
 mod register;
 mod saml;
 mod session;
@@ -38,6 +39,7 @@ pub use org::{
     revoke_pending_invite, transfer_org_owner,
     InviteCreated, OrgClientError, OrgMemberSummary, OrganizationSummary, UsersInOrgPage,
 };
+pub use password::{forgot_password, reset_password, PasswordResetAck};
 pub use register::{auth_register, signup_validate};
 pub use saml::{saml_callback, saml_login_start};
 pub use session::set_active_organization;

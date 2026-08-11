@@ -56,6 +56,8 @@ fn client_operations_exist_in_provider_contracts() {
             "/auth/social/{provider}/callback",
             "social_callback",
         ),
+        ("post", "/auth/password/forgot", "auth_forgot_password"),
+        ("post", "/auth/password/reset", "auth_reset_password"),
         (
             "post",
             "/sessions/active-organization",
@@ -64,6 +66,42 @@ fn client_operations_exist_in_provider_contracts() {
     ] {
         assert_operation(&login, method, path, operation);
     }
+
+    for schema in ["ForgotPasswordRequest", "ResetPasswordRequest"] {
+        let props = mapping_at(&login, &["components", "schemas", schema, "properties"]);
+        assert!(
+            props.contains_key("client_id"),
+            "{schema} must require client_id for Series A north–south"
+        );
+        let required = login
+            .get("components")
+            .and_then(|c| c.get("schemas"))
+            .and_then(|s| s.get(schema))
+            .and_then(|s| s.get("required"))
+            .and_then(Value::as_sequence)
+            .unwrap_or_else(|| panic!("{schema}.required"));
+        assert!(
+            required.iter().any(|v| v.as_str() == Some("client_id")),
+            "{schema}.required must include client_id"
+        );
+    }
+
+    let social = login
+        .get("paths")
+        .and_then(|p| p.get("/auth/social/{provider}/login"))
+        .and_then(|p| p.get("get"))
+        .expect("social_login operation");
+    let social_params = social
+        .get("parameters")
+        .and_then(Value::as_sequence)
+        .expect("social_login parameters");
+    assert!(
+        social_params.iter().any(|param| {
+            param.get("name").and_then(Value::as_str) == Some("client_id")
+                && param.get("required").and_then(Value::as_bool) == Some(true)
+        }),
+        "social_login must require client_id query"
+    );
 
     let org = read_spec(&root.join("openapi/idam/org-mgmt/openapi.yaml"));
     for (method, path, operation) in [
