@@ -102,3 +102,56 @@ mod tests {
         assert!(body.get("organization_id").is_none());
     }
 }
+
+/// Refresh-token rotation against sesame identity-session-service
+/// `POST {session_base}/session/refresh`.
+///
+/// The session service owns rotation; the login-service `/auth/token`
+/// endpoint handles the OAuth grants only (authorization_code,
+/// client_credentials, token-exchange) and answers **empty-200** for
+/// `grant_type=refresh_token` — its `auth_token.rs` says so and it was
+/// verified live (2026-09-03). Consumers that hand-rolled refresh against
+/// `{login_base}/auth/token` were silently logging users out at
+/// access-token expiry; this export replaces those.
+///
+/// Sesame also answers 200 with empty token fields for an unknown or
+/// expired refresh token — mapped to [`LoginError::Unauthorized`].
+///
+/// # Errors
+///
+/// See [`LoginError`].
+pub fn auth_refresh(
+    config: &SesameIdamClientConfig,
+    refresh_token: &str,
+) -> Result<TokenResponse, LoginError> {
+    let body = serde_json::to_vec(&serde_json::json!({
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+        "client_id": config.client_id,
+    }))
+    .map_err(|e| LoginError::Transport(e.to_string()))?;
+    let options = HttpFetchOptions {
+        timeout: config.timeout,
+        extra_headers: vec![
+            ("Content-Type".to_string(), "application/json".to_string()),
+            ("X-Tenant-ID".to_string(), config.tenant_id.clone()),
+        ],
+        ..HttpFetchOptions::default()
+    };
+    let url = format!("{}/session/refresh", config.session_base());
+    let (status, bytes) =
+        fetch_post(&url, &body, &options).map_err(|e| LoginError::Transport(e.to_string()))?;
+    let text = String::from_utf8(bytes).unwrap_or_default();
+    if status == 401 {
+        return Err(LoginError::Unauthorized);
+    }
+    if !(200..300).contains(&status) {
+        return Err(LoginError::Upstream { status, body: text });
+    }
+    let tokens: TokenResponse =
+        serde_json::from_str(&text).map_err(|e| LoginError::Decode(format!("{e}; body={text}")))?;
+    if tokens.access_token.is_empty() {
+        return Err(LoginError::Unauthorized);
+    }
+    Ok(tokens)
+}

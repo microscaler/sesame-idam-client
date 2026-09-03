@@ -32,7 +32,7 @@ pub use config::{
     ORG_MGMT_BASE_URL_KEY, PUBLIC_API_BASE_URL_KEY, SESSION_BASE_URL_KEY, TENANT_ID_KEY,
 };
 pub use identity::{fetch_current_user, patch_current_user, SesameUserProfile};
-pub use login::{auth_login, LoginError};
+pub use login::{auth_login, auth_refresh, LoginError};
 pub use org::{
     accept_invitation, change_user_role_in_org, create_organization, fetch_users_in_org,
     challenge_org_owner_transfer, invite_user_to_org, remove_user_from_org,
