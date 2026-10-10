@@ -60,48 +60,6 @@ fn login_body(
     serde_json::to_vec(&body).map_err(|e| LoginError::Transport(e.to_string()))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn login_posts_to_the_login_base_verbatim() {
-        let cfg = SesameIdamClientConfig::new(
-            "https://api.sesameidentity.dev.local/idam/v1",
-            "https://org-mgmt.internal.example/idam/v1",
-            "https://session.internal.example/idam/v1",
-            "hauliage",
-            "hauliage-web",
-        )
-        .expect("valid config");
-        assert_eq!(
-            cfg.login_url(),
-            "https://api.sesameidentity.dev.local/idam/v1/auth/login"
-        );
-    }
-
-    #[test]
-    fn login_body_carries_registered_client_id() {
-        let cfg = SesameIdamClientConfig::new(
-            "https://api.sesameidentity.dev.local/idam/v1",
-            "https://org-mgmt.internal.example/idam/v1",
-            "https://session.internal.example/idam/v1",
-            "hauliage",
-            "hauliage-web",
-        )
-        .expect("valid config");
-        let request = LoginRequest {
-            email: "alice@example.com".to_string(),
-            password: "password".to_string(),
-            organization_id: None,
-        };
-        let body: serde_json::Value =
-            serde_json::from_slice(&login_body(&cfg, &request).expect("body")).expect("json");
-        assert_eq!(body["client_id"], "hauliage-web");
-        assert!(body.get("organization_id").is_none());
-    }
-}
-
 /// Refresh-token rotation against sesame identity-session-service
 /// `POST {session_base}/session/refresh`.
 ///
@@ -153,4 +111,46 @@ pub fn auth_refresh(
         return Err(LoginError::Unauthorized);
     }
     Ok(tokens)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn login_posts_to_the_login_base_verbatim() {
+        let cfg = SesameIdamClientConfig::new(
+            "https://api.sesameidentity.dev.local/idam/v1",
+            "https://org-mgmt.internal.example/idam/v1",
+            "https://session.internal.example/idam/v1",
+            "hauliage",
+            "hauliage-web",
+        )
+        .expect("valid config");
+        assert_eq!(
+            cfg.login_url(),
+            "https://api.sesameidentity.dev.local/idam/v1/auth/login"
+        );
+    }
+
+    #[test]
+    fn login_body_carries_registered_client_id() {
+        let cfg = SesameIdamClientConfig::new(
+            "https://api.sesameidentity.dev.local/idam/v1",
+            "https://org-mgmt.internal.example/idam/v1",
+            "https://session.internal.example/idam/v1",
+            "hauliage",
+            "hauliage-web",
+        )
+        .expect("valid config");
+        let request = LoginRequest {
+            email: "alice@example.com".to_string(),
+            password: "password".to_string(),
+            organization_id: None,
+        };
+        let body: serde_json::Value =
+            serde_json::from_slice(&login_body(&cfg, &request).expect("body")).expect("json");
+        assert_eq!(body["client_id"], "hauliage-web");
+        assert!(body.get("organization_id").is_none());
+    }
 }
