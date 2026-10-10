@@ -6,8 +6,24 @@
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-/// Namespace containing Sesame authorization claims.
+/// Default namespace containing Sesame authorization claims. A deployment names its own with
+/// `SESAME_CLAIMS_NAMESPACE`; see [`authorization_claims_namespace`].
 pub const AUTHORIZATION_CLAIMS_NAMESPACE: &str = "https://sesame-idam.dev/claims";
+
+/// Environment variable naming the deployment's claim namespace, as the Sesame deployment issuing the
+/// tokens is configured.
+pub const CLAIMS_NAMESPACE_KEY: &str = "SESAME_CLAIMS_NAMESPACE";
+
+/// The namespace containing Sesame authorization claims in this deployment: [`CLAIMS_NAMESPACE_KEY`] when
+/// set, else [`AUTHORIZATION_CLAIMS_NAMESPACE`]. Read once per process; it must match the issuing Sesame.
+#[must_use]
+pub fn authorization_claims_namespace() -> &'static str {
+    static NAMESPACE: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    NAMESPACE.get_or_init(|| match std::env::var(CLAIMS_NAMESPACE_KEY) {
+        Ok(v) if !v.trim().is_empty() => v.trim().to_string(),
+        _ => AUTHORIZATION_CLAIMS_NAMESPACE.to_string(),
+    })
+}
 
 /// Supported provider profile version for this client release.
 pub const SUPPORTED_PROVIDER_PROFILE: &str = "1.0.0";
@@ -92,9 +108,9 @@ pub fn parse_validated_claims(claims: Option<&Value>) -> Result<ValidatedClaims,
     let client_id = optional_string(claims.get("client_id"), "client_id")?;
     let token_version = optional_u64(claims.get("ver"), "ver")?;
     let authorization = claims
-        .get(AUTHORIZATION_CLAIMS_NAMESPACE)
+        .get(authorization_claims_namespace())
         .and_then(Value::as_object)
-        .ok_or(ClaimsError::MissingField(AUTHORIZATION_CLAIMS_NAMESPACE))?;
+        .ok_or(ClaimsError::MissingField(authorization_claims_namespace()))?;
     let authorization_tenant = required_string(
         authorization
             .get("tenant")
@@ -234,7 +250,7 @@ mod tests {
             "tenant_id": "acme",
             "org_id": "b2000002-0002-4000-8000-000000000002",
             "user_type": "service",
-            "https://sesame-idam.dev/claims": {
+            AUTHORIZATION_CLAIMS_NAMESPACE: {
                 "tenant": "acme",
                 "roles": ["billing"],
                 "permissions": ["accounting:invoice:write"]

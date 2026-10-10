@@ -23,21 +23,21 @@ mod social;
 mod types;
 
 pub use claims::{
-    map_to_verified_principal, parse_validated_claims, ClaimsError, ValidatedClaims,
-    AUTHORIZATION_CLAIMS_NAMESPACE, SUPPORTED_FIXTURE_VERSION, SUPPORTED_PROVIDER_PROFILE,
-    SUPPORTED_TENANT_CONSUMER_API,
+    authorization_claims_namespace, map_to_verified_principal, parse_validated_claims, ClaimsError,
+    ValidatedClaims, AUTHORIZATION_CLAIMS_NAMESPACE, CLAIMS_NAMESPACE_KEY,
+    SUPPORTED_FIXTURE_VERSION, SUPPORTED_PROVIDER_PROFILE, SUPPORTED_TENANT_CONSUMER_API,
 };
 pub use config::{
-    ConfigError, SesameIdamClientConfig, CLIENT_ID_KEY, LOGIN_BASE_URL_KEY,
-    ORG_MGMT_BASE_URL_KEY, PUBLIC_API_BASE_URL_KEY, SESSION_BASE_URL_KEY, TENANT_ID_KEY,
+    ConfigError, SesameIdamClientConfig, CLIENT_ID_KEY, LOGIN_BASE_URL_KEY, ORG_MGMT_BASE_URL_KEY,
+    PUBLIC_API_BASE_URL_KEY, SESSION_BASE_URL_KEY, TENANT_ID_KEY,
 };
 pub use identity::{fetch_current_user, patch_current_user, SesameUserProfile};
 pub use login::{auth_login, auth_refresh, LoginError};
 pub use org::{
-    accept_invitation, change_user_role_in_org, create_organization, fetch_users_in_org,
-    challenge_org_owner_transfer, invite_user_to_org, remove_user_from_org,
-    revoke_pending_invite, transfer_org_owner,
-    InviteCreated, OrgClientError, OrgMemberSummary, OrganizationSummary, UsersInOrgPage,
+    accept_invitation, challenge_org_owner_transfer, change_user_role_in_org, create_organization,
+    fetch_users_in_org, invite_user_to_org, remove_user_from_org, revoke_pending_invite,
+    transfer_org_owner, InviteCreated, OrgClientError, OrgMemberSummary, OrganizationSummary,
+    UsersInOrgPage,
 };
 pub use password::{forgot_password, reset_password, PasswordResetAck};
 pub use register::{auth_register, signup_validate};

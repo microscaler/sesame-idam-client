@@ -47,6 +47,14 @@ replacement silently became a no-op once the deployment moved off cluster DNS
 onto a real hostname, and org and session traffic was sent to the login host
 instead of failing.
 
+### Claim namespace
+
+The authorization claims in a Sesame access token sit under the issuing deployment's claim namespace, a URI it
+controls. Set `SESAME_CLAIMS_NAMESPACE` to the same value as that Sesame deployment; unset, it is
+`AUTHORIZATION_CLAIMS_NAMESPACE` (`https://sesame-idam.dev/claims`). Read once per process
+(`authorization_claims_namespace()`); a token whose authorization claims sit under another key is rejected
+(`ClaimsError::MissingField`).
+
 ## Development layout
 
 During rapid development the repositories are expected to be siblings:
