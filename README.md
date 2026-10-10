@@ -103,8 +103,11 @@ Passing claims parsed directly from an unverified token is a security defect.
 
 ## SAML status
 
-The moved Hauliage integration already contains SAML login/callback methods.
-They are retained to avoid breaking its consumer during extraction, but the
-current Sesame login-service OpenAPI does not publish those operations. Treat
-them as pre-contract and do not enable them in a production flow until Sesame
-owns and implements the endpoints and the contract test is extended.
+`saml_login_start`, `saml_callback` and `saml_domain_discovery` follow Sesame's
+`docs/DESIGN-saml-sp.md` (section 4): the tenant comes from the registered
+`client_id` (no `X-Tenant-ID`), the relying party never handles SAML, and the
+one-time `saml_access_code` Sesame puts on the registered `redirect_uri` is
+bound to that client and redirect URI. They are pre-contract until Sesame's
+identity-login OpenAPI publishes the operations; the pending test
+`saml_operations_exist_in_provider_contract` then becomes gating. Do not enable
+them in a production flow before that.

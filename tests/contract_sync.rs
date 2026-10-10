@@ -261,3 +261,19 @@ fn tenant_consumer_public_contract_lockstep() {
         "fixture VERSION fixture_version mismatch"
     );
 }
+
+/// The client's SAML calls (`src/saml.rs`) against the provider contract of Sesame's DESIGN-saml-sp.md §4. Pending
+/// until identity-login publishes the operations; it then loses its `#[ignore]` and gates like the rest.
+#[test]
+#[ignore = "pending: Sesame identity-login does not publish the SAML operations yet (DESIGN-saml-sp.md)"]
+fn saml_operations_exist_in_provider_contract() {
+    let root = sesame_repo();
+    let login = read_spec(&root.join("openapi/idam/identity-login-service/openapi.yaml"));
+    for (method, path, operation) in [
+        ("get", "/auth/saml/login", "saml_login"),
+        ("post", "/auth/saml/callback", "saml_callback"),
+        ("post", "/auth/saml/discover", "saml_domain_discovery"),
+    ] {
+        assert_operation(&login, method, path, operation);
+    }
+}

@@ -41,7 +41,7 @@ pub use org::{
 };
 pub use password::{forgot_password, reset_password, PasswordResetAck};
 pub use register::{auth_register, signup_validate};
-pub use saml::{saml_callback, saml_login_start};
+pub use saml::{saml_callback, saml_domain_discovery, saml_login_start};
 pub use session::set_active_organization;
 pub use social::{social_callback, social_login_start};
 pub use types::{LoginRequest, RegisterRequest, SignupValidationResponse, TokenResponse};
