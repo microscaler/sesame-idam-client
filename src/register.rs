@@ -39,7 +39,8 @@ pub fn auth_register(
     request: &RegisterRequest,
 ) -> Result<TokenResponse, LoginError> {
     let url = auth_url(config, "/auth/register");
-    let mut body = serde_json::to_value(request).map_err(|e| LoginError::Transport(e.to_string()))?;
+    let mut body =
+        serde_json::to_value(request).map_err(|e| LoginError::Transport(e.to_string()))?;
     if let Some(obj) = body.as_object_mut() {
         obj.insert(
             "client_id".to_string(),
@@ -129,8 +130,7 @@ mod tests {
             username: Some("alice".to_string()),
             phone: None,
         };
-        let mut body =
-            serde_json::to_value(&request).expect("serialize register request");
+        let mut body = serde_json::to_value(&request).expect("serialize register request");
         if let Some(obj) = body.as_object_mut() {
             obj.insert(
                 "client_id".to_string(),

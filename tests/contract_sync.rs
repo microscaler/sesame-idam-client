@@ -244,19 +244,14 @@ fn tenant_consumer_public_contract_lockstep() {
     }
     let org = mapping_at(
         &tenant,
-        &[
-            "components",
-            "schemas",
-            "OrganizationSummary",
-            "properties",
-        ],
+        &["components", "schemas", "OrganizationSummary", "properties"],
     );
     for field in ["id", "name", "tenant_id"] {
         assert!(org.contains_key(field), "OrganizationSummary lost {field}");
     }
 
-    let version = fs::read_to_string(root.join("conformance/oidc-v1/VERSION"))
-        .expect("conformance VERSION");
+    let version =
+        fs::read_to_string(root.join("conformance/oidc-v1/VERSION")).expect("conformance VERSION");
     assert!(
         version.contains(&format!("provider_profile={SUPPORTED_PROVIDER_PROFILE}")),
         "fixture VERSION provider_profile mismatch"

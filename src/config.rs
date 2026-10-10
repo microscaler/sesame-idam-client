@@ -246,20 +246,14 @@ mod tests {
     const CLIENT: &str = "hauliage-web";
 
     fn cfg() -> SesameIdamClientConfig {
-        SesameIdamClientConfig::new(LOGIN, ORG, SESSION, "hauliage", CLIENT)
-            .expect("valid config")
+        SesameIdamClientConfig::new(LOGIN, ORG, SESSION, "hauliage", CLIENT).expect("valid config")
     }
 
     #[test]
     fn registered_client_id_is_required() {
         let error =
             SesameIdamClientConfig::new(LOGIN, ORG, SESSION, "hauliage", "   ").unwrap_err();
-        assert_eq!(
-            error,
-            ConfigError::Missing {
-                key: CLIENT_ID_KEY
-            }
-        );
+        assert_eq!(error, ConfigError::Missing { key: CLIENT_ID_KEY });
     }
 
     #[test]
@@ -312,8 +306,7 @@ mod tests {
 
     #[test]
     fn missing_login_base_names_the_key() {
-        let error =
-            SesameIdamClientConfig::new("", ORG, SESSION, "hauliage", CLIENT).unwrap_err();
+        let error = SesameIdamClientConfig::new("", ORG, SESSION, "hauliage", CLIENT).unwrap_err();
         assert_eq!(
             error,
             ConfigError::Missing {
@@ -338,8 +331,7 @@ mod tests {
 
     #[test]
     fn missing_session_base_names_the_key() {
-        let error =
-            SesameIdamClientConfig::new(LOGIN, ORG, "", "hauliage", CLIENT).unwrap_err();
+        let error = SesameIdamClientConfig::new(LOGIN, ORG, "", "hauliage", CLIENT).unwrap_err();
         assert_eq!(
             error,
             ConfigError::Missing {
@@ -406,15 +398,14 @@ mod tests {
 
     #[test]
     fn rejects_a_base_without_a_scheme() {
-        let error =
-            SesameIdamClientConfig::new(
-                LOGIN,
-                "org-mgmt:8080/idam/v1",
-                SESSION,
-                "hauliage",
-                CLIENT,
-            )
-            .unwrap_err();
+        let error = SesameIdamClientConfig::new(
+            LOGIN,
+            "org-mgmt:8080/idam/v1",
+            SESSION,
+            "hauliage",
+            CLIENT,
+        )
+        .unwrap_err();
         assert!(matches!(
             error,
             ConfigError::Invalid {

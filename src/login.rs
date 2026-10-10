@@ -57,8 +57,7 @@ fn login_body(
     if let Some(organization_id) = request.organization_id.as_ref() {
         body["organization_id"] = serde_json::Value::String(organization_id.clone());
     }
-    serde_json::to_vec(&body)
-    .map_err(|e| LoginError::Transport(e.to_string()))
+    serde_json::to_vec(&body).map_err(|e| LoginError::Transport(e.to_string()))
 }
 
 #[cfg(test)]

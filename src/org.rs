@@ -115,8 +115,8 @@ pub fn change_user_role_in_org(
     let body = serde_json::json!({ "primary_role": primary_role });
     let bytes = serde_json::to_vec(&body).map_err(|e| OrgClientError::Transport(e.to_string()))?;
     let options = auth_options(config, access_token);
-    let (status, resp_bytes) =
-        fetch_patch(&url, &bytes, &options).map_err(|e| OrgClientError::Transport(e.to_string()))?;
+    let (status, resp_bytes) = fetch_patch(&url, &bytes, &options)
+        .map_err(|e| OrgClientError::Transport(e.to_string()))?;
     let text = String::from_utf8(resp_bytes).unwrap_or_default();
     if status == 401 {
         return Err(OrgClientError::Unauthorized);
