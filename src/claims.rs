@@ -1,6 +1,6 @@
 //! Parsing for claims that BRRTRouter has already authenticated.
 //!
-//! Mapping aligns with Sesame provider profile `1.0.0` and
+//! Mapping aligns with Sesame provider profile `2.0.0` (ID tokens RS256; claims unchanged since `1.0.0`) and
 //! `docs/standards-first-oidc/verified-principal-mapping-v1.md`.
 
 use serde_json::{json, Value};
@@ -26,13 +26,13 @@ pub fn authorization_claims_namespace() -> &'static str {
 }
 
 /// Supported provider profile version for this client release.
-pub const SUPPORTED_PROVIDER_PROFILE: &str = "1.0.0";
+pub const SUPPORTED_PROVIDER_PROFILE: &str = "2.0.0";
 
 /// Supported public tenant-consumer OpenAPI version.
 pub const SUPPORTED_TENANT_CONSUMER_API: &str = "1.1.0";
 
 /// Supported conformance fixture version.
-pub const SUPPORTED_FIXTURE_VERSION: &str = "1.1.0";
+pub const SUPPORTED_FIXTURE_VERSION: &str = "1.2.0";
 
 /// Identity and authorization facts required by tenant-aware consumers.
 #[derive(Clone, Debug, PartialEq, Eq)]
