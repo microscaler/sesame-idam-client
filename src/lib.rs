@@ -10,6 +10,7 @@
 //! [`ConfigError::Missing`] naming the key, not a default. Base URLs are never
 //! derived from one another.
 
+pub mod bff;
 mod claims;
 mod config;
 mod identity;

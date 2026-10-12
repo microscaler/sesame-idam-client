@@ -4,6 +4,14 @@ All notable changes will be documented here.
 
 ## Unreleased
 
+- Add the `bff` module (Sesame ADR-014): relying-party BFFs sign users in
+  through the hosted login as confidential OIDC clients (authorization code,
+  PKCE S256, `state`, `nonce`, `client_secret_basic`), hold the tokens in a
+  server-side store and give the browser an opaque `__Host-` cookie. Covers
+  ID-token checks, single-flight refresh, the sliding idle and absolute
+  timeouts, CSRF checks for non-safe methods, logout, "sign out everywhere"
+  and session-id rotation on privilege change. `MemoryStore` for tests;
+  `RedisStore` behind the `redis-store` feature (Redis 6.2 or later).
 - Extract the Hauliage Sesame integration into a standalone shared crate.
 - Use sibling BRRTRouter and Sesame-IDAM repositories during rapid development.
 - Align registration and signup validation types with current provider specs.

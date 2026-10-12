@@ -19,6 +19,17 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 urlencoding = "2.1"
 uuid = { version = "1.0", features = ["serde"] }
+# bff module (ADR-014): PKCE, opaque session ids, Basic client auth,
+# coroutine-friendly waits, and the optional Redis session store.
+base64 = "0.22"
+getrandom = "0.2"
+may = "0.3"
+sha2 = "0.10"
+redis = { version = "0.25", default-features = false, optional = true }
+
+[features]
+default = []
+redis-store = ["dep:redis"]
 
 [dev-dependencies]
 serde_yaml = "0.9"

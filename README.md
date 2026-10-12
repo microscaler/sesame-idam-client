@@ -55,6 +55,42 @@ controls. Set `SESAME_CLAIMS_NAMESPACE` to the same value as that Sesame deploym
 (`authorization_claims_namespace()`); a token whose authorization claims sit under another key is rejected
 (`ClaimsError::MissingField`).
 
+## Relying-party BFF sessions
+
+A relying party's browser app should never hold a Sesame token (Sesame
+ADR-014). `sesame_idam_client::bff` is the server side of that: the BFF is a
+confidential OIDC client, every sign-in method runs on Sesame's hosted login,
+and the browser gets only an opaque `__Host-` session cookie.
+
+```rust,ignore
+use std::sync::Arc;
+use sesame_idam_client::bff::{Bff, BffConfig, RedisStore};
+
+let config = BffConfig::from_lookup("SESAME_BFF_", |k| std::env::var(k).ok())?;
+let store = Arc::new(RedisStore::new(&redis_url, "app-bff:", Duration::from_millis(500))?);
+let bff = Bff::with_http(config, store);
+
+// GET /auth/start?return_to=/x   -> bff.start_login(return_to)       -> 302
+// GET /auth/callback?code&state  -> bff.complete_login(code, state, error) -> 302 + Set-Cookie
+// /api/** (non-GET)              -> bff.check_csrf(method, header)
+// /api/**                        -> bff.resolve(cookie_header)?.access_token as the downstream bearer
+// POST /auth/logout              -> bff.logout(cookie_header)          -> 302 + cleared cookie
+```
+
+Settings (after the prefix) are listed in `bff::ENV_KEYS`. Required:
+`CLIENT_ID`, `CLIENT_SECRET` or `CLIENT_SECRET_FILE`, `TENANT_ID`, `ISSUER`,
+`AUTHORIZE_URL` (browser-facing), `TOKEN_URL` and `REVOKE_URL` (back channel),
+`REDIRECT_URI`, `COOKIE_NAME` (`__Host-` prefixed) and `ALLOWED_ORIGINS`.
+Defaults: 30-minute sliding idle timeout, 12-hour absolute timeout,
+`X-Requested-With: sesame-bff` as the CSRF header.
+
+The session store keys sessions by the SHA-256 of the cookie, so a store dump
+yields no usable cookie. ID tokens are checked for issuer, audience, `azp`,
+nonce, expiry and subject; add a JWKS signature check with
+`Bff::with_id_token_signature_check`. The password, registration and social
+helpers above are for Sesame's own hosted surface and machine flows, not for
+relying-party BFFs.
+
 ## Development layout
 
 During rapid development the repositories are expected to be siblings:
