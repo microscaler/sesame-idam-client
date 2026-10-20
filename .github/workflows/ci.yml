@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || fromJSON('["self-hosted", "linux", "x64", "microscaler"]') }}
     steps:
       - uses: actions/checkout@v4
       - name: Check out sibling dependencies
