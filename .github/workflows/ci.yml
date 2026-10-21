@@ -16,7 +16,7 @@ jobs:
   check:
     runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || fromJSON('["self-hosted", "linux", "x64", "microscaler"]') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Check out sibling dependencies
         run: |
           git clone --depth 1 https://github.com/microscaler/BRRTRouter.git ../BRRTRouter
