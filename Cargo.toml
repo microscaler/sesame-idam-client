@@ -13,8 +13,8 @@ publish = false
 # Pinned git dep (CI truth): a path dep breaks every consumer that pulls this
 # crate from git. Local co-development redirects via the ancestor cargo config
 # (~/Workspace/remote/microscaler/.cargo/config.toml [patch]), never here.
-# rev 10e5684 = BRRTRouter main, the rev PriceWhisperer pins (one brrtrouter in its graph).
-brrtrouter = { git = "https://github.com/microscaler/BRRTRouter.git", rev = "10e568407e461c1cf651ec13299b48cc8bf9260e", default-features = false }
+# rev b08921a = BRRTRouter main, the rev PriceWhisperer pins (one brrtrouter in its graph).
+brrtrouter = { git = "https://github.com/microscaler/BRRTRouter.git", rev = "b08921ac68ec715d53c8997aea6b3c8c47fd38bc", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 urlencoding = "2.1"
