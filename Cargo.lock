@@ -341,7 +341,7 @@ checksum = "dc0b364ead1874514c8c2855ab558056ebfeb775653e7ae45ff72f28f8f3166c"
 [[package]]
 name = "brrtrouter"
 version = "0.1.0-alpha.1"
-source = "git+https://github.com/microscaler/BRRTRouter.git?rev=1ac12a7c518a479434a416b7ddaf89555f258ea2#1ac12a7c518a479434a416b7ddaf89555f258ea2"
+source = "git+https://github.com/microscaler/BRRTRouter.git?rev=c0f0000057e6b4d32da6adce03e2ce7864726a20#c0f0000057e6b4d32da6adce03e2ce7864726a20"
 dependencies = [
  "anyhow",
  "arc-swap",
