@@ -341,7 +341,7 @@ checksum = "dc0b364ead1874514c8c2855ab558056ebfeb775653e7ae45ff72f28f8f3166c"
 [[package]]
 name = "brrtrouter"
 version = "0.1.0-alpha.1"
-source = "git+https://github.com/microscaler/BRRTRouter.git?rev=c0f0000057e6b4d32da6adce03e2ce7864726a20#c0f0000057e6b4d32da6adce03e2ce7864726a20"
+source = "git+https://github.com/microscaler/BRRTRouter.git?rev=10c18e203762dc93157a897711551bdfa6ca51b0#10c18e203762dc93157a897711551bdfa6ca51b0"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -2005,8 +2005,9 @@ checksum = "c2a86d3146ed3995b5913c414f6664344b9617457320782e64f0bb44afd49d74"
 [[package]]
 name = "microscaler-observability"
 version = "0.1.0"
-source = "git+https://github.com/microscaler/microscaler-observability.git?rev=1e79c71d2f1f0563fae1da92dfec270e836be43e#1e79c71d2f1f0563fae1da92dfec270e836be43e"
+source = "git+https://github.com/microscaler/microscaler-observability.git?rev=2b7e35c7a64e5a70e035d1b4fc6527bd1ea2751f#2b7e35c7a64e5a70e035d1b4fc6527bd1ea2751f"
 dependencies = [
+ "backtrace",
  "base64 0.22.1",
  "flate2",
  "jemalloc_pprof",
@@ -2532,8 +2533,7 @@ checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
 [[package]]
 name = "pprof"
 version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38a01da47675efa7673b032bf8efd8214f1917d89685e07e395ab125ea42b187"
+source = "git+https://github.com/microscaler/pprof-rs.git?rev=ccc6819e45e2440eba00d3be572a1cb81b52ec5b#ccc6819e45e2440eba00d3be572a1cb81b52ec5b"
 dependencies = [
  "aligned-vec",
  "backtrace",
