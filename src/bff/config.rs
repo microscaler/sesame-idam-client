@@ -61,6 +61,10 @@ pub struct BffConfig {
     pub idle_timeout: Duration,
     pub absolute_timeout: Duration,
     pub http_timeout: Duration,
+    /// How long a sign-in may take between `/auth/start` and `/auth/callback`. Keep it at least as long as Sesame's
+    /// authorization request (30 minutes), or a slow but successful sign-in comes back to a forgotten state and has
+    /// to start again.
+    pub preauth_ttl: Duration,
 }
 
 /// A missing or unacceptable setting, by environment key.
@@ -106,6 +110,7 @@ pub const ENV_KEYS: &[&str] = &[
     "IDLE_TIMEOUT_SECS",
     "ABSOLUTE_TIMEOUT_SECS",
     "HTTP_TIMEOUT_MS",
+    "PREAUTH_TTL_SECS",
 ];
 
 fn is_local_http(url: &str) -> bool {
@@ -142,7 +147,8 @@ impl BffConfig {
     /// `REDIRECT_URI`, `COOKIE_NAME`, `ALLOWED_ORIGINS` (comma-separated).
     /// Defaults: scope `openid profile email`, `CSRF_HEADER`
     /// `X-Requested-With: sesame-bff`, prefixes `/`, return to `/`, idle 30
-    /// minutes, absolute 12 hours, HTTP timeout 5 s.
+    /// minutes, absolute 12 hours, HTTP timeout 5 s, sign-in (pre-auth) 30
+    /// minutes.
     ///
     /// # Errors
     /// [`BffConfigError`] naming the key.
@@ -227,6 +233,7 @@ impl BffConfig {
             idle_timeout: secs("IDLE_TIMEOUT_SECS", 30 * 60)?,
             absolute_timeout: secs("ABSOLUTE_TIMEOUT_SECS", 12 * 3600)?,
             http_timeout,
+            preauth_ttl: secs("PREAUTH_TTL_SECS", super::PREAUTH_TTL.as_secs())?,
         }
         .validated()
     }
@@ -298,6 +305,9 @@ impl BffConfig {
                 "must be positive and at most the absolute timeout",
             );
         }
+        if self.preauth_ttl.is_zero() || self.preauth_ttl > Duration::from_secs(24 * 3600) {
+            return bad("PREAUTH_TTL_SECS", "must be positive and at most a day");
+        }
         if !self.scope.split(' ').any(|s| s == "openid") {
             return bad("SCOPE", "must include openid");
         }
@@ -368,9 +378,35 @@ pub(crate) mod tests {
         let c = config();
         assert_eq!(c.idle_timeout, Duration::from_secs(1800));
         assert_eq!(c.absolute_timeout, Duration::from_secs(43200));
+        assert_eq!(c.preauth_ttl, Duration::from_secs(1800));
         assert_eq!(c.scope, "openid profile email");
         assert_eq!(c.csrf_header, ("X-App-Request".into(), "1".into()));
         assert!(!format!("{c:?}").contains("s3cret"));
+    }
+
+    #[test]
+    fn long_lived_sessions_are_accepted() {
+        // PriceWhisperer trader in pp: 8 h idle, 7 days absolute.
+        let mut e = env();
+        e.insert("BFF_IDLE_TIMEOUT_SECS".into(), "28800".into());
+        e.insert("BFF_ABSOLUTE_TIMEOUT_SECS".into(), "604800".into());
+        let c = BffConfig::from_lookup("BFF_", |k| e.get(k).cloned()).expect("valid");
+        assert_eq!(c.idle_timeout, Duration::from_secs(8 * 3600));
+        assert_eq!(c.absolute_timeout, Duration::from_secs(7 * 86400));
+        // The idle window may never exceed the absolute one.
+        e.insert("BFF_IDLE_TIMEOUT_SECS".into(), "604801".into());
+        assert!(BffConfig::from_lookup("BFF_", |k| e.get(k).cloned()).is_err());
+    }
+
+    #[test]
+    fn preauth_ttl_is_configurable_and_bounded() {
+        assert_eq!(
+            with("PREAUTH_TTL_SECS", "3600").unwrap().preauth_ttl,
+            Duration::from_secs(3600)
+        );
+        assert!(with("PREAUTH_TTL_SECS", "0").is_err());
+        assert!(with("PREAUTH_TTL_SECS", "86401").is_err());
+        assert!(with("PREAUTH_TTL_SECS", "ten").is_err());
     }
 
     #[test]

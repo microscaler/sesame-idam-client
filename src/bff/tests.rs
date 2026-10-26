@@ -566,3 +566,100 @@ fn concurrent_refresh_is_single_flight() {
         "every request got the refreshed token"
     );
 }
+
+/// A [`MemoryStore`] that records the TTLs the BFF asks for.
+#[derive(Default)]
+struct TtlRecorder {
+    inner: MemoryStore,
+    preauth: Mutex<Vec<Duration>>,
+    session: Mutex<Vec<Duration>>,
+}
+
+impl SessionStore for TtlRecorder {
+    fn put_preauth(&self, state: &str, record: &PreAuth, ttl: Duration) -> Result<(), StoreError> {
+        self.preauth.lock().unwrap().push(ttl);
+        self.inner.put_preauth(state, record, ttl)
+    }
+    fn take_preauth(&self, state: &str) -> Result<Option<PreAuth>, StoreError> {
+        self.inner.take_preauth(state)
+    }
+    fn put_session(
+        &self,
+        key: &str,
+        record: &SessionRecord,
+        ttl: Duration,
+    ) -> Result<(), StoreError> {
+        self.session.lock().unwrap().push(ttl);
+        self.inner.put_session(key, record, ttl)
+    }
+    fn get_session(&self, key: &str) -> Result<Option<SessionRecord>, StoreError> {
+        self.inner.get_session(key)
+    }
+    fn delete_session(&self, key: &str) -> Result<(), StoreError> {
+        self.inner.delete_session(key)
+    }
+    fn index_session(&self, subject_key: &str, key: &str, ttl: Duration) -> Result<(), StoreError> {
+        self.inner.index_session(subject_key, key, ttl)
+    }
+    fn unindex_session(&self, subject_key: &str, key: &str) -> Result<(), StoreError> {
+        self.inner.unindex_session(subject_key, key)
+    }
+    fn indexed_sessions(&self, subject_key: &str) -> Result<Vec<String>, StoreError> {
+        self.inner.indexed_sessions(subject_key)
+    }
+    fn try_lock(&self, name: &str, ttl: Duration) -> Result<bool, StoreError> {
+        self.inner.try_lock(name, ttl)
+    }
+    fn unlock(&self, name: &str) -> Result<(), StoreError> {
+        self.inner.unlock(name)
+    }
+}
+
+/// PriceWhisperer's trader in pp: 8 h idle, 7 days absolute. The store keeps the session for the idle window, the
+/// cookie lives to the absolute expiry, a quiet afternoon does not sign the trader out, and the sign-in state outlives
+/// Sesame's 30-minute authorization request.
+#[test]
+fn long_lived_session_follows_its_configured_windows() {
+    let mut c = config();
+    c.idle_timeout = Duration::from_secs(8 * 3600);
+    c.absolute_timeout = Duration::from_secs(7 * 86400);
+    let c = c.validated().expect("valid");
+    assert_eq!(c.preauth_ttl, PREAUTH_TTL);
+    assert_eq!(PREAUTH_TTL, Duration::from_secs(1800));
+
+    let idp = Arc::new(FakeIdp::default());
+    let store = Arc::new(TtlRecorder::default());
+    let bff = Bff::new(c, store.clone(), idp.clone()).with_clock(now);
+    let (cookie, done) = sign_in(&bff, &idp, None);
+
+    assert_eq!(
+        store.preauth.lock().unwrap().as_slice(),
+        [Duration::from_secs(1800)]
+    );
+    assert!(done.set_cookie.unwrap().contains("Max-Age=604800"));
+    assert_eq!(
+        store.session.lock().unwrap().first().copied(),
+        Some(Duration::from_secs(8 * 3600))
+    );
+
+    // Four hours without a request (an hour and more is what used to sign traders out): still signed in.
+    advance(4 * 3600);
+    assert!(bff.resolve(Some(&cookie)).is_ok());
+    // The cookie's Max-Age counts down to the absolute expiry, not the idle window.
+    advance(7 * 86400);
+    assert_eq!(bff.resolve(Some(&cookie)).unwrap_err(), BffError::NoSession);
+}
+
+#[test]
+fn preauth_ttl_comes_from_config() {
+    let mut c = config();
+    c.preauth_ttl = Duration::from_secs(3600);
+    let idp = Arc::new(FakeIdp::default());
+    let store = Arc::new(TtlRecorder::default());
+    let bff = Bff::new(c, store.clone(), idp).with_clock(now);
+    bff.start_login(None).unwrap();
+    assert_eq!(
+        store.preauth.lock().unwrap().as_slice(),
+        [Duration::from_secs(3600)]
+    );
+}

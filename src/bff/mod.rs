@@ -31,8 +31,10 @@ pub use idp::{HttpIdentityProvider, IdentityProvider, IdpError, OidcTokens};
 pub use store::RedisStore;
 pub use store::{MemoryStore, PreAuth, SessionRecord, SessionStore, StoreError};
 
-/// How long a sign-in may take between `/auth/start` and `/auth/callback`.
-pub const PREAUTH_TTL: Duration = Duration::from_secs(600);
+/// Default for [`BffConfig::preauth_ttl`] (`PREAUTH_TTL_SECS`): how long a sign-in may take between `/auth/start`
+/// and `/auth/callback`. 30 minutes, the life of Sesame's authorization request (a hosted login page left open that
+/// long still completes, and must find its state here).
+pub const PREAUTH_TTL: Duration = Duration::from_secs(1800);
 /// Refresh the access token when it expires within this window.
 pub const REFRESH_LEEWAY_SECS: u64 = 60;
 /// Allowed clock skew when checking ID token times.
@@ -218,7 +220,7 @@ impl Bff {
                 return_to,
                 created_at: self.now(),
             },
-            PREAUTH_TTL,
+            self.config.preauth_ttl,
         )?;
         let location = format!(
             "{}?response_type=code&client_id={}&redirect_uri={}&scope={}&state={}&nonce={}&code_challenge={}&code_challenge_method=S256",
