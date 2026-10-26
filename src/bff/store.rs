@@ -281,27 +281,52 @@ mod redis_store {
             let mut slot = self.shards[idx]
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            if slot.is_none() {
-                let conn = self
-                    .client
-                    .get_connection_with_timeout(self.timeout)
-                    .map_err(|e| StoreError(e.to_string()))?;
-                conn.set_read_timeout(Some(self.timeout))
-                    .and_then(|()| conn.set_write_timeout(Some(self.timeout)))
-                    .map_err(|e| StoreError(e.to_string()))?;
-                *slot = Some(conn);
-            }
-            let conn = slot.as_mut().expect("connection just set");
-            match f(conn) {
-                Ok(v) => Ok(v),
+            // A kept connection can have been closed by the server while idle (Redis
+            // `timeout`, a proxy's idle cut): its first command then fails with
+            // "unexpected end of file" (pp: every `session_unavailable` 503 on
+            // `/auth/start` and `/auth/callback`, 19–25 Oct 2026). Such a failure on a reused
+            // connection is retried once on a fresh one; a fresh connection's failure is
+            // returned as is.
+            let reused = slot.is_some();
+            match self.run(&mut slot, &f) {
+                Err(e) if reused && Self::drops_connection(&e) => {
+                    *slot = None;
+                    self.run(&mut slot, &f).map_err(|e| {
+                        if Self::drops_connection(&e) {
+                            *slot = None;
+                        }
+                        StoreError(e.to_string())
+                    })
+                }
                 Err(e) => {
                     // Drop the connection on I/O trouble; the next call reconnects.
-                    if e.is_io_error() || e.is_timeout() || e.is_connection_dropped() {
+                    if Self::drops_connection(&e) {
                         *slot = None;
                     }
                     Err(StoreError(e.to_string()))
                 }
+                Ok(v) => Ok(v),
             }
+        }
+
+        fn drops_connection(e: &redis::RedisError) -> bool {
+            e.is_io_error() || e.is_timeout() || e.is_connection_dropped()
+        }
+
+        /// Run `f` on the slot's connection, opening one first if there is none.
+        fn run<T>(
+            &self,
+            slot: &mut Option<redis::Connection>,
+            f: &impl Fn(&mut redis::Connection) -> redis::RedisResult<T>,
+        ) -> redis::RedisResult<T> {
+            if slot.is_none() {
+                let conn = self.client.get_connection_with_timeout(self.timeout)?;
+                conn.set_read_timeout(Some(self.timeout))?;
+                conn.set_write_timeout(Some(self.timeout))?;
+                *slot = Some(conn);
+            }
+            let conn = slot.as_mut().expect("connection just set");
+            f(conn)
         }
 
         fn key(&self, kind: &str, id: &str) -> String {

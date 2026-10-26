@@ -4,6 +4,9 @@ All notable changes will be documented here.
 
 ## Unreleased
 
+- `RedisStore`: a command that fails because a reused connection was closed
+  while idle ("unexpected end of file") is retried once on a fresh connection
+  instead of failing the request (pp: `session_unavailable` 503s on sign-in).
 - Add the `bff` module (Sesame ADR-014): relying-party BFFs sign users in
   through the hosted login as confidential OIDC clients (authorization code,
   PKCE S256, `state`, `nonce`, `client_secret_basic`), hold the tokens in a
