@@ -13,8 +13,8 @@ publish = false
 # Pinned git dep (CI truth): a path dep breaks every consumer that pulls this
 # crate from git. Local co-development redirects via the ancestor cargo config
 # (~/Workspace/remote/microscaler/.cargo/config.toml [patch]), never here.
-# rev cbebc84 = BRRTRouter main, the rev PriceWhisperer pins (one brrtrouter in its graph).
-brrtrouter = { git = "https://github.com/microscaler/BRRTRouter.git", rev = "cbebc84575ce650e3c399a1de4e0e32ead87828f", default-features = false }
+# rev = BRRTRouter main, the rev the consumers pin (one brrtrouter in their graphs).
+brrtrouter = { git = "https://github.com/microscaler/BRRTRouter.git", rev = "9768e3583eebbdca2c7b4fc28b7a4a4963d74286", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 urlencoding = "2.1"
@@ -24,7 +24,7 @@ uuid = { version = "1.0", features = ["serde"] }
 base64 = "0.22"
 getrandom = "0.2"
 may = "0.3"
-sha2 = "0.10"
+sha2 = "0.11"
 redis = { version = "0.25", default-features = false, optional = true }
 
 [features]
@@ -38,3 +38,7 @@ reqwest = { version = "0.12", default-features = false, features = ["blocking", 
 
 [lints.rust]
 unsafe_code = "forbid"
+
+# Builds and tests here on the may fork the consumers use (their [patch.crates-io] governs them).
+[patch.crates-io]
+may = { git = "https://github.com/microscaler/may.git", rev = "719a78df9275ca5afc29e68d5b462b54833ef9cc" }
