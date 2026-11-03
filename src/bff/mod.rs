@@ -20,6 +20,7 @@
 mod config;
 mod crypto;
 mod idp;
+pub(crate) mod metrics;
 mod store;
 
 use std::sync::Arc;
@@ -27,6 +28,7 @@ use std::time::Duration;
 
 pub use config::{BffConfig, BffConfigError, Secret, ENV_KEYS};
 pub use idp::{HttpIdentityProvider, IdentityProvider, IdpError, OidcTokens};
+pub use metrics::render_prometheus;
 #[cfg(feature = "redis-store")]
 pub use store::RedisStore;
 pub use store::{MemoryStore, PreAuth, SessionRecord, SessionStore, StoreError};
@@ -45,6 +47,9 @@ const TOUCH_INTERVAL_SECS: u64 = 60;
 const REFRESH_LOCK: Duration = Duration::from_secs(10);
 const REFRESH_WAIT_STEPS: u32 = 30;
 const REFRESH_WAIT_STEP: Duration = Duration::from_millis(100);
+/// Tries at storing a refreshed session (see [`Bff::persist_refreshed`]) and the backoff unit between them.
+const PERSIST_ATTEMPTS: u32 = 3;
+const PERSIST_BACKOFF: Duration = Duration::from_millis(50);
 
 /// Why a BFF request failed. Map to HTTP as [`BffError::status`] suggests.
 #[derive(Debug, PartialEq, Eq)]
@@ -526,7 +531,7 @@ impl Bff {
                     }
                 }
                 record.last_seen = now;
-                self.store.put_session(key, &record, self.ttl(&record))?;
+                self.persist_refreshed(key, &record)?;
                 Ok(record)
             }
             Err(IdpError::Rejected { .. }) => {
@@ -539,6 +544,23 @@ impl Bff {
                     Ok(record)
                 } else {
                     Err(BffError::Unavailable(m))
+                }
+            }
+        }
+    }
+
+    /// Store a refreshed session. Sesame has already rotated the refresh token, so losing this write leaves the
+    /// session holding a spent one, and the next refresh (another tab's, usually) is refused as a reuse and ends
+    /// the session: the sign-in bounce of 3 Nov 2026. A failed write is retried before giving up.
+    fn persist_refreshed(&self, key: &str, record: &SessionRecord) -> Result<(), BffError> {
+        let mut attempt = 0u32;
+        loop {
+            match self.store.put_session(key, record, self.ttl(record)) {
+                Ok(()) => return Ok(()),
+                Err(e) if attempt + 1 >= PERSIST_ATTEMPTS => return Err(e.into()),
+                Err(_) => {
+                    attempt += 1;
+                    may::coroutine::sleep(PERSIST_BACKOFF * attempt);
                 }
             }
         }
