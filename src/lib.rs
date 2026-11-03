@@ -11,7 +11,6 @@
 //! derived from one another.
 
 pub mod bff;
-pub mod blocking;
 mod claims;
 mod config;
 mod identity;
