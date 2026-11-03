@@ -342,7 +342,7 @@ checksum = "dc0b364ead1874514c8c2855ab558056ebfeb775653e7ae45ff72f28f8f3166c"
 [[package]]
 name = "brrtrouter"
 version = "0.1.0-alpha.1"
-source = "git+https://github.com/microscaler/BRRTRouter.git?rev=a5f16a119a942b69fd5fbf91b281d1fe4c1983e8#a5f16a119a942b69fd5fbf91b281d1fe4c1983e8"
+source = "git+https://github.com/microscaler/BRRTRouter.git?rev=adbc75292225e622d17a06ef8138e78d15b5045b#adbc75292225e622d17a06ef8138e78d15b5045b"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -363,6 +363,7 @@ dependencies = [
  "may_tracing",
  "memory-stats",
  "microscaler-observability",
+ "microscaler-timing",
  "minijinja",
  "notify",
  "oas3",
@@ -1930,7 +1931,7 @@ dependencies = [
 [[package]]
 name = "may_minihttp"
 version = "0.1.11"
-source = "git+https://github.com/microscaler/may_minihttp.git?branch=integration%2Fmicroscaler-fork#61639cfb2b5d706a88785dfe6761617212dfa364"
+source = "git+https://github.com/microscaler/may_minihttp.git?branch=integration%2Fmicroscaler-fork#e3967b89bc1d5d3a2db863c6248c9dd004e94a3c"
 dependencies = [
  "bytes",
  "generator",
@@ -1938,8 +1939,10 @@ dependencies = [
  "httparse",
  "httpdate",
  "itoa",
+ "libc",
  "log",
  "may",
+ "microscaler-timing",
  "once_cell",
  "rustls",
  "rustls-platform-verifier",
@@ -2032,6 +2035,24 @@ dependencies = [
  "tracing-opentelemetry",
  "tracing-subscriber",
  "ureq",
+]
+
+[[package]]
+name = "microscaler-timing"
+version = "0.1.0"
+source = "git+https://github.com/microscaler/microscaler-observability.git?branch=main#f1b743bb58e3057d4bdb2236b73322e70d7b4f38"
+dependencies = [
+ "microscaler-timing-macros",
+]
+
+[[package]]
+name = "microscaler-timing-macros"
+version = "0.1.0"
+source = "git+https://github.com/microscaler/microscaler-observability.git?branch=main#f1b743bb58e3057d4bdb2236b73322e70d7b4f38"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]
