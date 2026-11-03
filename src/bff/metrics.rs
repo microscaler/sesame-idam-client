@@ -45,7 +45,8 @@ impl Hist {
 
 static HISTS: [Hist; OPS.len()] = [const { Hist::new() }; OPS.len()];
 
-/// Record one store call. Unknown `op` names are ignored.
+/// Record one store call. Unknown `op` names are ignored. Only the Redis store times its calls.
+#[cfg_attr(not(feature = "redis-store"), allow(dead_code))]
 pub(crate) fn observe(op: &str, took: Duration, ok: bool) {
     let Some(i) = OPS.iter().position(|o| *o == op) else {
         return;
