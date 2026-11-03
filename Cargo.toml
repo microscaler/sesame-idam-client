@@ -24,6 +24,9 @@ uuid = { version = "1.0", features = ["serde"] }
 base64 = "0.22"
 getrandom = "0.2"
 may = "0.3"
+# The session-store timings also land in op_duration_seconds{component="sesame.bff_store",op} (microscaler-timing), the
+# family the generic operation-latency dashboard reads. Zero dependencies; branch main in every crate of a binary.
+microscaler-timing = { git = "https://github.com/microscaler/microscaler-observability.git", branch = "main" }
 sha2 = "0.11"
 # may-native Redis client (coroutine-aware socket and waits) for the optional session store.
 may-redis = { git = "https://github.com/microscaler/may_redis.git", rev = "611620ccff2db71b61dd7c7505e882881d55ff79", optional = true }

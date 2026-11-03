@@ -2047,6 +2047,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "microscaler-timing"
+version = "0.1.0"
+source = "git+https://github.com/microscaler/microscaler-observability.git?branch=main#feb690dc81be8d6fce920c5088ead03c483b82af"
+dependencies = [
+ "microscaler-timing-macros",
+]
+
+[[package]]
+name = "microscaler-timing-macros"
+version = "0.1.0"
+source = "git+https://github.com/microscaler/microscaler-observability.git?branch=main#feb690dc81be8d6fce920c5088ead03c483b82af"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "mime"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3315,6 +3333,7 @@ dependencies = [
  "getrandom 0.2.17",
  "may",
  "may-redis",
+ "microscaler-timing",
  "reqwest",
  "serde",
  "serde_json",
