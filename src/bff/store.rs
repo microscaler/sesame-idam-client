@@ -374,10 +374,13 @@ mod redis_store {
             f: impl Fn(&RedisClient) -> Result<T, may_redis::RedisError>,
         ) -> Result<T, StoreError> {
             let started = Instant::now();
-            let result = self.inner.client().and_then(|c| match f(&c) {
+            // Only a kept connection is retried: one the server closed while it sat idle fails its
+            // next command (pp, Oct 2026). A connection opened for this call that fails is a real
+            // failure and is returned as is.
+            let result = self.inner.client().and_then(|(c, reused)| match f(&c) {
                 Ok(v) => Ok(v),
-                Err(e) if !c.is_alive() => {
-                    let fresh = self.inner.client()?;
+                Err(e) if reused && !c.is_alive() => {
+                    let (fresh, _) = self.inner.client()?;
                     f(&fresh).map_err(|e2| StoreError(format!("{e2} (after {e})")))
                 }
                 Err(e) => Err(StoreError(e.to_string())),
@@ -392,19 +395,20 @@ mod redis_store {
     }
 
     impl Inner {
-        /// The live client, connecting (or replacing a dead one) first if needed.
-        fn client(&self) -> Result<RedisClient, StoreError> {
+        /// The live client and whether it was kept from an earlier call, connecting (or
+        /// replacing a dead one) first if needed.
+        fn client(&self) -> Result<(RedisClient, bool), StoreError> {
             let mut slot = self
                 .client
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             if let Some(c) = slot.as_ref().filter(|c| c.is_alive()) {
-                return Ok(c.clone());
+                return Ok((c.clone(), true));
             }
             *slot = None;
             let c = self.connect()?;
             *slot = Some(c.clone());
-            Ok(c)
+            Ok((c, false))
         }
 
         fn connect(&self) -> Result<RedisClient, StoreError> {
