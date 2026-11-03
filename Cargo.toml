@@ -25,12 +25,11 @@ base64 = "0.22"
 getrandom = "0.2"
 may = "0.3"
 sha2 = "0.11"
-# may-native Redis client (coroutine-aware socket and waits) for the optional session store.
-may-redis = { git = "https://github.com/microscaler/may_redis.git", rev = "611620ccff2db71b61dd7c7505e882881d55ff79", optional = true }
+redis = { version = "0.25", default-features = false, optional = true }
 
 [features]
 default = []
-redis-store = ["dep:may-redis"]
+redis-store = ["dep:redis"]
 
 [dev-dependencies]
 serde_yaml = "0.9"

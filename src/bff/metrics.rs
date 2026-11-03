@@ -1,4 +1,5 @@
-//! `sesame_bff_store_seconds{op}`: how long each session-store call took as the request saw it (a reconnect included), and `sesame_bff_store_errors_total{op}`. Lock-free; rendered in Prometheus text by
+//! `sesame_bff_store_seconds{op}`: how long each session-store call took as the request saw it (queueing for an I/O
+//! thread included), and `sesame_bff_store_errors_total{op}`. Lock-free; rendered in Prometheus text by
 //! [`render_prometheus`] for the service's `/metrics`.
 
 use std::fmt::Write as _;
