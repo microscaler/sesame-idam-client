@@ -28,8 +28,8 @@ use std::time::Duration;
 
 pub use config::{BffConfig, BffConfigError, Secret, ENV_KEYS};
 pub use idp::{HttpIdentityProvider, IdentityProvider, IdpError, OidcTokens};
-#[cfg(feature = "redis-store")]
 pub use metrics::render_prometheus;
+#[cfg(feature = "redis-store")]
 pub use store::RedisStore;
 pub use store::{MemoryStore, PreAuth, SessionRecord, SessionStore, StoreError};
 
