@@ -663,3 +663,110 @@ fn preauth_ttl_comes_from_config() {
         [Duration::from_secs(3600)]
     );
 }
+
+/// A [`MemoryStore`] whose next `put_session` calls fail, the way a Redis timeout or a dropped connection does.
+#[derive(Default)]
+struct FlakyStore {
+    inner: MemoryStore,
+    fail_puts: Mutex<u32>,
+}
+
+impl SessionStore for FlakyStore {
+    fn put_preauth(&self, state: &str, record: &PreAuth, ttl: Duration) -> Result<(), StoreError> {
+        self.inner.put_preauth(state, record, ttl)
+    }
+    fn take_preauth(&self, state: &str) -> Result<Option<PreAuth>, StoreError> {
+        self.inner.take_preauth(state)
+    }
+    fn put_session(
+        &self,
+        key: &str,
+        record: &SessionRecord,
+        ttl: Duration,
+    ) -> Result<(), StoreError> {
+        {
+            let mut left = self.fail_puts.lock().unwrap();
+            if *left > 0 {
+                *left -= 1;
+                return Err(StoreError("timed out".into()));
+            }
+        }
+        self.inner.put_session(key, record, ttl)
+    }
+    fn get_session(&self, key: &str) -> Result<Option<SessionRecord>, StoreError> {
+        self.inner.get_session(key)
+    }
+    fn delete_session(&self, key: &str) -> Result<(), StoreError> {
+        self.inner.delete_session(key)
+    }
+    fn index_session(&self, subject_key: &str, key: &str, ttl: Duration) -> Result<(), StoreError> {
+        self.inner.index_session(subject_key, key, ttl)
+    }
+    fn unindex_session(&self, subject_key: &str, key: &str) -> Result<(), StoreError> {
+        self.inner.unindex_session(subject_key, key)
+    }
+    fn indexed_sessions(&self, subject_key: &str) -> Result<Vec<String>, StoreError> {
+        self.inner.indexed_sessions(subject_key)
+    }
+    fn try_lock(&self, name: &str, ttl: Duration) -> Result<bool, StoreError> {
+        self.inner.try_lock(name, ttl)
+    }
+    fn unlock(&self, name: &str) -> Result<(), StoreError> {
+        self.inner.unlock(name)
+    }
+}
+
+/// The two-tab sign-in bounce (pp, 3 Nov 2026): two tabs of one session refresh at the same moment, and the store
+/// write after Sesame rotated the refresh token fails once. Before the fix the rotated token was lost, the session
+/// kept the spent one, the other tab's refresh was refused as a reuse and the session was ended: a sign-in page in a
+/// browser that was signed in. The write is retried, so both tabs keep the session and Sesame is asked once.
+#[test]
+fn two_tabs_refreshing_while_the_store_write_fails_once_keep_the_session() {
+    let idp = Arc::new(FakeIdp::default());
+    let store = Arc::new(FlakyStore::default());
+    let bff = Bff::new(config(), store.clone(), idp.clone());
+    NOW.with(|n| n.set(system_now()));
+    let start = bff.start_login(None).unwrap();
+    *idp.nonce.lock().unwrap() = query(&start.location, "nonce").unwrap();
+    let state = query(&start.location, "state").unwrap();
+    let set = bff
+        .complete_login(Some("good-code"), Some(&state), None)
+        .unwrap()
+        .set_cookie
+        .unwrap();
+    let cookie = set.split(';').next().unwrap().to_string();
+    let key = crypto::session_key(crypto::cookie_value(&cookie, "__Host-app").unwrap());
+    let mut r = bff.store.get_session(&key).unwrap().unwrap();
+    r.access_expires_at = system_now() + 5;
+    bff.store
+        .put_session(&key, &r, Duration::from_secs(60))
+        .unwrap();
+    *store.fail_puts.lock().unwrap() = 1;
+
+    let tabs: Vec<_> = (0..2)
+        .map(|_| {
+            let (bff, cookie) = (bff.clone(), cookie.clone());
+            may::go!(move || bff.resolve(Some(&cookie)).map(|s| s.access_token))
+        })
+        .collect();
+    let tokens: Vec<_> = tabs
+        .into_iter()
+        .map(|t| t.join().unwrap().expect("neither tab is sent to sign in"))
+        .collect();
+    assert_eq!(
+        *idp.refresh_calls.lock().unwrap(),
+        1,
+        "Sesame is asked once"
+    );
+    assert_eq!(tokens[0], tokens[1], "both tabs carry the refreshed token");
+    // The next request (after the next expiry) refreshes with the rotated token, which Sesame still accepts.
+    let mut r = bff.store.get_session(&key).unwrap().unwrap();
+    r.access_expires_at = system_now() + 5;
+    bff.store
+        .put_session(&key, &r, Duration::from_secs(60))
+        .unwrap();
+    assert!(
+        bff.resolve(Some(&cookie)).is_ok(),
+        "the stored refresh token is the live one"
+    );
+}

@@ -240,20 +240,27 @@ pub use redis_store::RedisStore;
 #[cfg(feature = "redis-store")]
 mod redis_store {
     use super::{PreAuth, SessionRecord, SessionStore, StoreError};
-    use std::sync::Mutex;
-    use std::time::Duration;
+    use std::sync::Arc;
+    use std::time::{Duration, Instant};
 
-    /// Redis-backed store. Synchronous connections with timeouts, sharded
-    /// behind mutexes (the same pattern as Sesame's token-status lookup), so a
-    /// slow Redis bounds request latency rather than piling up coroutines.
+    /// Redis-backed store. Synchronous redis-rs connections with timeouts, sharded behind locks, and run on the
+    /// blocking I/O threads ([`crate::blocking::io`]): a request coroutine parks while its command runs, so a slow
+    /// Redis (or a reconnect) never holds a may worker and the other requests on it. The shard locks are may locks,
+    /// held only for one command, never across a call to Sesame.
+    ///
+    /// Each call is timed in `sesame_bff_store_seconds{op}` ([`crate::bff::render_prometheus`]).
     ///
     /// Keys are `{prefix}pre:{state}`, `{prefix}s:{hash}`, `{prefix}u:{subject}`
     /// and `{prefix}lock:{name}`. Give each BFF its own prefix or database.
     pub struct RedisStore {
-        client: redis::Client,
+        inner: Arc<Inner>,
         prefix: String,
+    }
+
+    struct Inner {
+        client: redis::Client,
         timeout: Duration,
-        shards: Vec<Mutex<Option<redis::Connection>>>,
+        shards: Vec<may::sync::Mutex<Option<redis::Connection>>>,
     }
 
     impl RedisStore {
@@ -262,22 +269,44 @@ mod redis_store {
         pub fn new(url: &str, prefix: &str, timeout: Duration) -> Result<Self, StoreError> {
             let client = redis::Client::open(url).map_err(|e| StoreError(e.to_string()))?;
             Ok(Self {
-                client,
+                inner: Arc::new(Inner {
+                    client,
+                    timeout,
+                    shards: (0..8).map(|_| may::sync::Mutex::new(None)).collect(),
+                }),
                 prefix: prefix.to_string(),
-                timeout,
-                shards: (0..8).map(|_| Mutex::new(None)).collect(),
             })
         }
 
-        fn with<T>(
-            &self,
-            route: &str,
-            f: impl Fn(&mut redis::Connection) -> redis::RedisResult<T>,
-        ) -> Result<T, StoreError> {
-            let idx = route
+        /// Run `f` with `key` on its shard's connection, on an I/O thread, and time it as `op`.
+        fn with<T, F>(&self, op: &'static str, key: String, f: F) -> Result<T, StoreError>
+        where
+            T: Send + 'static,
+            F: Fn(&mut redis::Connection, &str) -> redis::RedisResult<T> + Send + 'static,
+        {
+            let idx = key
                 .bytes()
                 .fold(0usize, |a, b| a.wrapping_mul(31).wrapping_add(b as usize))
-                % self.shards.len();
+                % self.inner.shards.len();
+            let inner = Arc::clone(&self.inner);
+            let started = Instant::now();
+            let result = crate::blocking::io(move || inner.on_shard(idx, &key, &f));
+            crate::bff::metrics::observe(op, started.elapsed(), result.is_ok());
+            result
+        }
+
+        fn key(&self, kind: &str, id: &str) -> String {
+            format!("{}{kind}:{id}", self.prefix)
+        }
+    }
+
+    impl Inner {
+        fn on_shard<T>(
+            &self,
+            idx: usize,
+            key: &str,
+            f: &impl Fn(&mut redis::Connection, &str) -> redis::RedisResult<T>,
+        ) -> Result<T, StoreError> {
             let mut slot = self.shards[idx]
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -288,10 +317,10 @@ mod redis_store {
             // connection is retried once on a fresh one; a fresh connection's failure is
             // returned as is.
             let reused = slot.is_some();
-            match self.run(&mut slot, &f) {
+            match self.run(&mut slot, key, f) {
                 Err(e) if reused && Self::drops_connection(&e) => {
                     *slot = None;
-                    self.run(&mut slot, &f).map_err(|e| {
+                    self.run(&mut slot, key, f).map_err(|e| {
                         if Self::drops_connection(&e) {
                             *slot = None;
                         }
@@ -317,7 +346,8 @@ mod redis_store {
         fn run<T>(
             &self,
             slot: &mut Option<redis::Connection>,
-            f: &impl Fn(&mut redis::Connection) -> redis::RedisResult<T>,
+            key: &str,
+            f: &impl Fn(&mut redis::Connection, &str) -> redis::RedisResult<T>,
         ) -> redis::RedisResult<T> {
             if slot.is_none() {
                 let conn = self.client.get_connection_with_timeout(self.timeout)?;
@@ -326,11 +356,7 @@ mod redis_store {
                 *slot = Some(conn);
             }
             let conn = slot.as_mut().expect("connection just set");
-            f(conn)
-        }
-
-        fn key(&self, kind: &str, id: &str) -> String {
-            format!("{}{kind}:{id}", self.prefix)
+            f(conn, key)
         }
     }
 
@@ -352,21 +378,17 @@ mod redis_store {
             record: &PreAuth,
             ttl: Duration,
         ) -> Result<(), StoreError> {
-            let k = self.key("pre", state);
             let v = serde_json::to_string(record).map_err(|e| StoreError(e.to_string()))?;
-            self.with(&k, |c| {
-                redis::cmd("SET")
-                    .arg(&k)
-                    .arg(&v)
-                    .arg("PX")
-                    .arg(ms(ttl))
-                    .query(c)
+            let px = ms(ttl);
+            self.with("put_preauth", self.key("pre", state), move |c, k| {
+                redis::cmd("SET").arg(k).arg(&v).arg("PX").arg(px).query(c)
             })
         }
 
         fn take_preauth(&self, state: &str) -> Result<Option<PreAuth>, StoreError> {
-            let k = self.key("pre", state);
-            decode(self.with(&k, |c| redis::cmd("GETDEL").arg(&k).query(c))?)
+            decode(self.with("take_preauth", self.key("pre", state), |c, k| {
+                redis::cmd("GETDEL").arg(k).query(c)
+            })?)
         }
 
         fn put_session(
@@ -375,26 +397,23 @@ mod redis_store {
             record: &SessionRecord,
             ttl: Duration,
         ) -> Result<(), StoreError> {
-            let k = self.key("s", key);
             let v = serde_json::to_string(record).map_err(|e| StoreError(e.to_string()))?;
-            self.with(&k, |c| {
-                redis::cmd("SET")
-                    .arg(&k)
-                    .arg(&v)
-                    .arg("PX")
-                    .arg(ms(ttl))
-                    .query(c)
+            let px = ms(ttl);
+            self.with("put_session", self.key("s", key), move |c, k| {
+                redis::cmd("SET").arg(k).arg(&v).arg("PX").arg(px).query(c)
             })
         }
 
         fn get_session(&self, key: &str) -> Result<Option<SessionRecord>, StoreError> {
-            let k = self.key("s", key);
-            decode(self.with(&k, |c| redis::cmd("GET").arg(&k).query(c))?)
+            decode(self.with("get_session", self.key("s", key), |c, k| {
+                redis::cmd("GET").arg(k).query(c)
+            })?)
         }
 
         fn delete_session(&self, key: &str) -> Result<(), StoreError> {
-            let k = self.key("s", key);
-            self.with(&k, |c| redis::cmd("DEL").arg(&k).query(c))
+            self.with("delete_session", self.key("s", key), |c, k| {
+                redis::cmd("DEL").arg(k).query(c)
+            })
         }
 
         fn index_session(
@@ -403,49 +422,57 @@ mod redis_store {
             key: &str,
             ttl: Duration,
         ) -> Result<(), StoreError> {
-            let k = self.key("u", subject_key);
-            self.with(&k, |c| {
+            let member = key.to_string();
+            let px = ms(ttl);
+            self.with("index_session", self.key("u", subject_key), move |c, k| {
                 redis::pipe()
                     .cmd("SADD")
-                    .arg(&k)
-                    .arg(key)
+                    .arg(k)
+                    .arg(&member)
                     .ignore()
                     // The newest session lives longest, so its TTL covers the set.
                     .cmd("PEXPIRE")
-                    .arg(&k)
-                    .arg(ms(ttl))
+                    .arg(k)
+                    .arg(px)
                     .ignore()
                     .query(c)
             })
         }
 
         fn unindex_session(&self, subject_key: &str, key: &str) -> Result<(), StoreError> {
-            let k = self.key("u", subject_key);
-            self.with(&k, |c| redis::cmd("SREM").arg(&k).arg(key).query(c))
+            let member = key.to_string();
+            self.with(
+                "unindex_session",
+                self.key("u", subject_key),
+                move |c, k| redis::cmd("SREM").arg(k).arg(&member).query(c),
+            )
         }
 
         fn indexed_sessions(&self, subject_key: &str) -> Result<Vec<String>, StoreError> {
-            let k = self.key("u", subject_key);
-            self.with(&k, |c| redis::cmd("SMEMBERS").arg(&k).query(c))
+            self.with("indexed_sessions", self.key("u", subject_key), |c, k| {
+                redis::cmd("SMEMBERS").arg(k).query(c)
+            })
         }
 
         fn try_lock(&self, name: &str, ttl: Duration) -> Result<bool, StoreError> {
-            let k = self.key("lock", name);
-            let set: Option<String> = self.with(&k, |c| {
-                redis::cmd("SET")
-                    .arg(&k)
-                    .arg("1")
-                    .arg("NX")
-                    .arg("PX")
-                    .arg(ms(ttl))
-                    .query(c)
-            })?;
+            let px = ms(ttl);
+            let set: Option<String> =
+                self.with("try_lock", self.key("lock", name), move |c, k| {
+                    redis::cmd("SET")
+                        .arg(k)
+                        .arg("1")
+                        .arg("NX")
+                        .arg("PX")
+                        .arg(px)
+                        .query(c)
+                })?;
             Ok(set.is_some())
         }
 
         fn unlock(&self, name: &str) -> Result<(), StoreError> {
-            let k = self.key("lock", name);
-            self.with(&k, |c| redis::cmd("DEL").arg(&k).query(c))
+            self.with("unlock", self.key("lock", name), |c, k| {
+                redis::cmd("DEL").arg(k).query(c)
+            })
         }
     }
 }
