@@ -14,7 +14,7 @@ publish = false
 # crate from git. Local co-development redirects via the ancestor cargo config
 # (~/Workspace/remote/microscaler/.cargo/config.toml [patch]), never here.
 # rev = BRRTRouter main, the rev the consumers pin (one brrtrouter in their graphs).
-brrtrouter = { git = "https://github.com/microscaler/BRRTRouter.git", rev = "a5f16a119a942b69fd5fbf91b281d1fe4c1983e8", default-features = false }
+brrtrouter = { git = "https://github.com/microscaler/BRRTRouter.git", rev = "adbc75292225e622d17a06ef8138e78d15b5045b", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 urlencoding = "2.1"
@@ -28,12 +28,11 @@ may = "0.3"
 # family the generic operation-latency dashboard reads. Zero dependencies; branch main in every crate of a binary.
 microscaler-timing = { git = "https://github.com/microscaler/microscaler-observability.git", branch = "main" }
 sha2 = "0.11"
-# may-native Redis client (coroutine-aware socket and waits) for the optional session store.
-may-redis = { git = "https://github.com/microscaler/may_redis.git", rev = "611620ccff2db71b61dd7c7505e882881d55ff79", optional = true }
+redis = { version = "0.25", default-features = false, optional = true }
 
 [features]
 default = []
-redis-store = ["dep:may-redis"]
+redis-store = ["dep:redis"]
 
 [dev-dependencies]
 serde_yaml = "0.9"
