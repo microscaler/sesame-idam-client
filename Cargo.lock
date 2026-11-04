@@ -3336,6 +3336,7 @@ dependencies = [
  "brrtrouter",
  "getrandom 0.2.17",
  "may",
+ "microscaler-timing",
  "redis",
  "reqwest",
  "serde",
