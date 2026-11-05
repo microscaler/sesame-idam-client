@@ -342,7 +342,6 @@ checksum = "dc0b364ead1874514c8c2855ab558056ebfeb775653e7ae45ff72f28f8f3166c"
 [[package]]
 name = "brrtrouter"
 version = "0.1.0-alpha.1"
-source = "git+https://github.com/microscaler/BRRTRouter.git?rev=cb10df40d46c83811aa5a3016388e5b92af8df6a#cb10df40d46c83811aa5a3016388e5b92af8df6a"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -2015,7 +2014,6 @@ checksum = "c2a86d3146ed3995b5913c414f6664344b9617457320782e64f0bb44afd49d74"
 [[package]]
 name = "microscaler-observability"
 version = "0.1.0"
-source = "git+https://github.com/microscaler/microscaler-observability.git?rev=2b7e35c7a64e5a70e035d1b4fc6527bd1ea2751f#2b7e35c7a64e5a70e035d1b4fc6527bd1ea2751f"
 dependencies = [
  "backtrace",
  "base64 0.22.1",
@@ -4699,3 +4697,23 @@ name = "zmij"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b"
+
+[[patch.unused]]
+name = "may_postgres"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "lifeguard"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "lifeguard-derive"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "lifeguard-migrate"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "brrtrouter_macros"
+version = "0.1.0"
