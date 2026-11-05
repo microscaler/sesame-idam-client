@@ -342,7 +342,7 @@ checksum = "dc0b364ead1874514c8c2855ab558056ebfeb775653e7ae45ff72f28f8f3166c"
 [[package]]
 name = "brrtrouter"
 version = "0.1.0-alpha.1"
-source = "git+https://github.com/microscaler/BRRTRouter.git?rev=f925f2d8ade56925c3699a53886d3292e1bf9799#f925f2d8ade56925c3699a53886d3292e1bf9799"
+source = "git+https://github.com/microscaler/BRRTRouter.git?rev=d8576a6a4a69a840e91f1615bd8b8f9869c8b273#d8576a6a4a69a840e91f1615bd8b8f9869c8b273"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -2015,7 +2015,7 @@ checksum = "c2a86d3146ed3995b5913c414f6664344b9617457320782e64f0bb44afd49d74"
 [[package]]
 name = "microscaler-observability"
 version = "0.1.0"
-source = "git+https://github.com/microscaler/microscaler-observability.git?rev=2b7e35c7a64e5a70e035d1b4fc6527bd1ea2751f#2b7e35c7a64e5a70e035d1b4fc6527bd1ea2751f"
+source = "git+https://github.com/microscaler/microscaler-observability.git?rev=65991efe24c94001e71ec8cad7a1a7304ececfbd#65991efe24c94001e71ec8cad7a1a7304ececfbd"
 dependencies = [
  "backtrace",
  "base64 0.22.1",
@@ -2040,7 +2040,7 @@ dependencies = [
 [[package]]
 name = "microscaler-timing"
 version = "0.1.0"
-source = "git+https://github.com/microscaler/microscaler-observability.git?branch=main#4bcc9333668b15af88b09ce6ec3e215b5261a06a"
+source = "git+https://github.com/microscaler/microscaler-observability.git?branch=main#65991efe24c94001e71ec8cad7a1a7304ececfbd"
 dependencies = [
  "microscaler-timing-macros",
 ]
@@ -2048,7 +2048,7 @@ dependencies = [
 [[package]]
 name = "microscaler-timing-macros"
 version = "0.1.0"
-source = "git+https://github.com/microscaler/microscaler-observability.git?branch=main#4bcc9333668b15af88b09ce6ec3e215b5261a06a"
+source = "git+https://github.com/microscaler/microscaler-observability.git?branch=main#65991efe24c94001e71ec8cad7a1a7304ececfbd"
 dependencies = [
  "proc-macro2",
  "quote",
