@@ -342,7 +342,7 @@ checksum = "dc0b364ead1874514c8c2855ab558056ebfeb775653e7ae45ff72f28f8f3166c"
 [[package]]
 name = "brrtrouter"
 version = "0.1.0-alpha.1"
-source = "git+https://github.com/microscaler/BRRTRouter.git?rev=d8576a6a4a69a840e91f1615bd8b8f9869c8b273#d8576a6a4a69a840e91f1615bd8b8f9869c8b273"
+source = "git+https://github.com/microscaler/BRRTRouter.git?rev=4b1fe29f544d3ec7864a9d8389ce87f9a52efd70#4b1fe29f544d3ec7864a9d8389ce87f9a52efd70"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -1931,7 +1931,7 @@ dependencies = [
 [[package]]
 name = "may_minihttp"
 version = "0.1.11"
-source = "git+https://github.com/microscaler/may_minihttp.git?branch=integration%2Fmicroscaler-fork#e3967b89bc1d5d3a2db863c6248c9dd004e94a3c"
+source = "git+https://github.com/microscaler/may_minihttp.git?branch=integration%2Fmicroscaler-fork#1613d6970eef2f732e7e740a31acb54d04182121"
 dependencies = [
  "bytes",
  "generator",
@@ -2040,7 +2040,7 @@ dependencies = [
 [[package]]
 name = "microscaler-timing"
 version = "0.1.0"
-source = "git+https://github.com/microscaler/microscaler-observability.git?branch=main#65991efe24c94001e71ec8cad7a1a7304ececfbd"
+source = "git+https://github.com/microscaler/microscaler-observability.git?branch=main#f59bccb10e749eb3e9a79545158067e96377b0b7"
 dependencies = [
  "microscaler-timing-macros",
 ]
@@ -2048,11 +2048,11 @@ dependencies = [
 [[package]]
 name = "microscaler-timing-macros"
 version = "0.1.0"
-source = "git+https://github.com/microscaler/microscaler-observability.git?branch=main#65991efe24c94001e71ec8cad7a1a7304ececfbd"
+source = "git+https://github.com/microscaler/microscaler-observability.git?branch=main#f59bccb10e749eb3e9a79545158067e96377b0b7"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.119",
+ "syn 3.0.9",
 ]
 
 [[package]]
